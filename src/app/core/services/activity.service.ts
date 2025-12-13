@@ -1,55 +1,66 @@
-import { Injectable, signal } from '@angular/core';
-import { BehaviorSubject, Observable, merge, of } from 'rxjs';
-import { Activity, ActivityType } from '../models/activity.model';
+import { Injectable, inject } from '@angular/core';
+import { HttpClient, HttpParams } from '@angular/common/http';
+import { Observable } from 'rxjs';
+import { Activity } from '../models/activity.model';
+import { environment } from '../../../environments/environment';
+
+interface ActivityListResponse {
+  data: Activity[];
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
 
 @Injectable({
   providedIn: 'root',
 })
 export class ActivityService {
-  private activitiesSubject = new BehaviorSubject<Activity[]>([]);
-  public activities$ = this.activitiesSubject.asObservable();
+  private http = inject(HttpClient);
+  private apiUrl = `${environment.apiUrl}/activities`;
 
-  private activitiesSignal = signal<Activity[]>([]);
+  /**
+   * Get activities for a specific project
+   */
+  getProjectActivities(
+    projectId: string,
+    page: number = 1,
+    limit: number = 10
+  ): Observable<ActivityListResponse> {
+    const params = new HttpParams().set('page', page.toString()).set('limit', limit.toString());
 
-  constructor() {
-    this.loadMockActivities();
+    return this.http.get<ActivityListResponse>(`${this.apiUrl}/project/${projectId}`, { params });
   }
 
-  private loadMockActivities(): void {
-    const mockActivities: Activity[] = [
-      {
-        id: '1',
-        type: ActivityType.TASK_CREATED,
-        userId: 'user-1',
-        userName: 'John Doe',
-        taskId: '1',
-        taskTitle: 'Design Homepage',
-        details: 'Created new task "Design Homepage"',
-        timestamp: new Date(),
-      },
-    ];
+  /**
+   * Get activities for a specific task
+   */
+  getTaskActivities(
+    taskId: string,
+    page: number = 1,
+    limit: number = 10
+  ): Observable<ActivityListResponse> {
+    const params = new HttpParams().set('page', page.toString()).set('limit', limit.toString());
 
-    this.activitiesSignal.set(mockActivities);
-    this.activitiesSubject.next(mockActivities);
+    return this.http.get<ActivityListResponse>(`${this.apiUrl}/task/${taskId}`, { params });
   }
 
-  logActivity(activity: Omit<Activity, 'id' | 'timestamp'>): void {
-    const newActivity: Activity = {
-      ...activity,
-      id: this.generateId(),
-      timestamp: new Date(),
-    };
+  /**
+   * Get recent activities (for a project or task)
+   * Convenience method that returns just the data array
+   */
+  getRecentActivities(
+    type: 'project' | 'task',
+    id: string,
+    limit: number = 10
+  ): Observable<Activity[]> {
+    const params = new HttpParams().set('page', '1').set('limit', limit.toString());
 
-    const updated = [newActivity, ...this.activitiesSignal()];
-    this.activitiesSignal.set(updated);
-    this.activitiesSubject.next(updated);
-  }
+    const endpoint =
+      type === 'project' ? `${this.apiUrl}/project/${id}` : `${this.apiUrl}/task/${id}`;
 
-  getRecentActivities(limit: number = 10): Observable<Activity[]> {
-    return of(this.activitiesSignal().slice(0, limit));
-  }
-
-  private generateId(): string {
-    return `activity-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    return this.http.get<Activity[]>(endpoint, { params });
   }
 }
