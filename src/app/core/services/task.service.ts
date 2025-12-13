@@ -203,7 +203,7 @@ export class TasksService {
 
     const updatedTask = {
       ...tasks[taskIndex],
-      comments: [...tasks[taskIndex].comments, comment],
+      comments: [...(tasks[taskIndex].comments || []), comment],
       updatedAt: new Date(),
     };
 
