@@ -4,6 +4,9 @@ import { adminGuard } from './core/guards/admin.guard';
 import { projectMemberGuard } from './core/guards/project-member.guard';
 
 export const routes: Routes = [
+  // ============================================
+  // PUBLIC ROUTES - Auth Feature (Person 3)
+  // ============================================
   {
     path: 'auth',
     children: [
@@ -34,7 +37,9 @@ export const routes: Routes = [
     ],
   },
 
-
+  // ============================================
+  // PROTECTED ROUTES - Projects Feature (Person 4)
+  // ============================================
   {
     path: 'projects',
     canActivate: [authGuard],
