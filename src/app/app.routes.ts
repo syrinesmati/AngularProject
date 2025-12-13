@@ -2,6 +2,7 @@ import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
 import { adminGuard } from './core/guards/admin.guard';
 import { projectMemberGuard } from './core/guards/project-member.guard';
+import { projectResolver, projectsResolver, userResolver } from './core/resolvers';
 
 export const routes: Routes = [
   // ============================================
@@ -40,6 +41,7 @@ export const routes: Routes = [
             (m) => m.ProjectsComponent
           ),
         data: { title: 'Projects' },
+        resolve: { projects: projectsResolver },
       },
       // TODO: Person 4 - Create project-create component
       // {
@@ -61,7 +63,7 @@ export const routes: Routes = [
                 (m) => m.BoardComponent
               ),
             data: { title: 'Project Board' },
-            // resolve: { project: ProjectResolver } // TODO: Create in Task 4
+            resolve: { project: projectResolver },
           },
           // TODO: Person 4 - Create project-tasks component
           // {
