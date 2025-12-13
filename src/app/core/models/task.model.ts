@@ -5,6 +5,7 @@ export enum TaskStatus {
   IN_PROGRESS = 'IN_PROGRESS',
   IN_REVIEW = 'IN_REVIEW',
   DONE = 'DONE',
+  DOING = 'DOING', // Alias for IN_PROGRESS
 }
 
 export enum TaskPriority {
@@ -21,11 +22,13 @@ export interface Task {
   status: TaskStatus;
   priority: TaskPriority;
   dueDate?: Date;
-  position: number;
+  position?: number;
   projectId: string;
-  ownerId: string;
-  createdAt: Date;
-  updatedAt: Date;
+  ownerId?: string;
+  createdBy?: string;
+  assignedTo?: string[]; // Array of user IDs
+  createdAt?: Date;
+  updatedAt?: Date;
 
   // Relations
   owner?: User;
@@ -59,8 +62,9 @@ export interface Comment {
   content: string;
   taskId: string;
   userId: string;
+  userName?: string;
   createdAt: Date;
-  updatedAt: Date;
+  updatedAt?: Date;
   user?: User;
 }
 
