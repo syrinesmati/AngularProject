@@ -76,6 +76,26 @@ export class TasksService extends BaseService {
   }
 
   /**
+   * Get all tasks assigned to the authenticated user
+   */
+  getMyTasks(filter?: FilterTaskDto): Observable<TaskListResponse> {
+    let params = new HttpParams();
+
+    if (filter) {
+      if (filter.status) params = params.set('status', filter.status);
+      if (filter.priority) params = params.set('priority', filter.priority);
+      if (filter.search) params = params.set('search', filter.search);
+      if (filter.page) params = params.set('page', filter.page.toString());
+      if (filter.limit) params = params.set('limit', filter.limit.toString());
+    }
+
+    return this.http.get<TaskListResponse>(this.buildUrl('/tasks/my-tasks'), {
+      params,
+      withCredentials: true,
+    });
+  }
+
+  /**
    * Get a single task by ID
    */
   getTaskById(id: string): Observable<Task> {

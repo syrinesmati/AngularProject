@@ -19,7 +19,13 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
         // Server-side error
         switch (error.status) {
           case 401:
-            // Unauthorized - token expired or invalid
+            // Skip handling 401 for login/register endpoints - let component handle it
+            if (req.url.includes('/auth/login') || req.url.includes('/auth/register')) {
+              errorMessage = error.error?.message || 'Invalid credentials.';
+              break;
+            }
+
+            // Unauthorized - token expired or invalid for other endpoints
             console.error('Unauthorized - redirecting to login');
             authService.logout().subscribe({
               next: () => router.navigate(['/auth/login']),
