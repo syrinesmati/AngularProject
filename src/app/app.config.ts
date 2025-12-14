@@ -1,7 +1,34 @@
-import { ApplicationConfig } from '@angular/core';
+import { ApplicationConfig, importProvidersFrom } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { routes } from './app.routes';
+import {
+  LucideAngularModule,
+  FileText,
+  Home,
+  ChevronRight,
+  Search,
+  Bell,
+  User,
+  Settings,
+  HelpCircle,
+  LogOut,
+  ChevronDown,
+  LayoutDashboard,
+  FolderOpen,
+  ListTodo,
+  Kanban,
+  Shield,
+  CheckSquare,
+  ChevronLeft,
+  MessageSquare,
+  Calendar,
+  UserPlus,
+  Check,
+  CheckCheck,
+  BellOff,
+  X,
+} from 'lucide-angular';
 
 // Import interceptors
 import { authInterceptor } from './core/interceptors/auth.interceptor';
@@ -23,6 +50,34 @@ export const appConfig: ApplicationConfig = {
         loadingInterceptor, // Third - show loading
         errorInterceptor, // Last - handle errors
       ])
+    ),
+    importProvidersFrom(
+      LucideAngularModule.pick({
+        FileText,
+        Home,
+        ChevronRight,
+        Search,
+        Bell,
+        User,
+        Settings,
+        HelpCircle,
+        LogOut,
+        ChevronDown,
+        LayoutDashboard,
+        FolderOpen,
+        ListTodo,
+        Kanban,
+        Shield,
+        CheckSquare,
+        ChevronLeft,
+        MessageSquare,
+        Calendar,
+        UserPlus,
+        Check,
+        CheckCheck,
+        BellOff,
+        X,
+      })
     ),
     {
       provide: API_CONFIG,

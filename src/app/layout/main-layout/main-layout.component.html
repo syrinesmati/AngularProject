@@ -1,0 +1,9 @@
+<div class="min-h-screen bg-background">
+  <app-sidebar (collapsedChange)="onSidebarCollapsedChange($event)" />
+  <div class="transition-all duration-300" [ngClass]="sidebarCollapsed() ? 'ml-16' : 'ml-64'">
+    <app-header />
+    <main class="p-6">
+      <router-outlet />
+    </main>
+  </div>
+</div>
