@@ -2,7 +2,7 @@ import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
 import { adminGuard } from './core/guards/admin.guard';
 import { projectMemberGuard } from './core/guards/project-member.guard';
-import { projectResolver, projectsResolver, userResolver } from './core/resolvers';
+import { projectResolver, projectsResolver, tasksResolver, userResolver } from './core/resolvers';
 import { MainLayoutComponent } from './layout/main-layout/main-layout.component';
 
 export const routes: Routes = [
@@ -91,6 +91,15 @@ export const routes: Routes = [
             loadComponent: () =>
               import('./features/tasks/tasks/tasks.component').then((m) => m.TasksComponent),
             data: { title: 'My Tasks' },
+            resolve: { tasks: tasksResolver },
+          },
+          {
+            path: 'new',
+            loadComponent: () =>
+              import('./features/tasks/task-form/task-form.component').then(
+                (m) => m.TaskFormComponent
+              ),
+            data: { title: 'Create Task' },
           },
           {
             path: 'new',
@@ -101,6 +110,30 @@ export const routes: Routes = [
             data: { title: 'Create Task' },
           },
         ],
+      },
+
+
+      {
+        path: 'profile/edit',
+        loadComponent: () => import('./features/profile/profile-form/profile-form.component').then(m => m.ProfileFormComponent),
+        data: { title: 'Edit Profile' },
+      },
+      {
+        path: 'settings/edit',
+        loadComponent: () => import('./features/settings/settings-form/settings-form.component').then(m => m.SettingsFormComponent),
+        data: { title: 'Settings' },
+      },
+
+
+      {
+        path: 'profile',
+        redirectTo: 'profile/edit',
+        pathMatch: 'full',
+      },
+      {
+        path: 'settings',
+        redirectTo: 'settings/edit',
+        pathMatch: 'full',
       },
 
 
@@ -182,16 +215,13 @@ export const routes: Routes = [
   // ============================================
   {
     path: '',
-    redirectTo: 'projects',
+    redirectTo: 'dashboard',
     pathMatch: 'full',
   },
-  // TODO: Create not-found component in shared/pages
-  // {
-  //   path: '**',
-  //   loadComponent: () =>
-  //     import('./shared/pages/not-found/not-found.component').then(
-  //       (m) => m.NotFoundComponent
-  //     ),
-  //   data: { title: 'Page Not Found' },
-  // },
+  {
+    path: '**',
+    loadComponent: () =>
+      import('./features/not-found/not-found.component').then((m) => m.NotFoundComponent),
+    data: { title: 'Page Not Found' },
+  },
 ];
