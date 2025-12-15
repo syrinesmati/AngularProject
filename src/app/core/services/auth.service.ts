@@ -1,3 +1,4 @@
+// auth.service.ts - FIXED version with proper public refreshCurrentUser method
 import { Injectable, signal, computed, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { BehaviorSubject, Observable, tap } from 'rxjs';
@@ -34,7 +35,7 @@ export class AuthService extends BaseService {
     if (userJson) {
       const user = JSON.parse(userJson);
       console.log('Setting current user from storage:', user);
-      this.setCurrentUser(user);
+      this.updateCurrentUser(user);
     } else {
       console.log('No user data in storage');
     }
@@ -73,7 +74,7 @@ export class AuthService extends BaseService {
   me(): Observable<{ user: User }> {
     return this.http.get<{ user: User }>(this.buildUrl('/auth/me'), { withCredentials: true }).pipe(
       tap((response) => {
-        this.setCurrentUser(response.user);
+        this.updateCurrentUser(response.user);
       })
     );
   }
@@ -98,7 +99,7 @@ export class AuthService extends BaseService {
   private handleAuthSuccess(response: AuthResponse): void {
     // Token is stored in httpOnly cookie by backend
     // Just store user data
-    this.setCurrentUser(response.user);
+    this.updateCurrentUser(response.user);
   }
 
   /**
@@ -112,12 +113,23 @@ export class AuthService extends BaseService {
   }
 
   /**
-   * Set current user in state and storage
+   * Update current user in state and storage (internal use)
    */
-  private setCurrentUser(user: User): void {
+  private updateCurrentUser(user: User): void {
+    console.log('Updating current user:', user);
     localStorage.setItem('currentUser', JSON.stringify(user));
     this.currentUserSubject.next(user);
     this.currentUserSignal.set(user);
+    console.log('Current user signal set to:', this.currentUserSignal());
+  }
+
+  /**
+   * Refresh current user (used after profile updates)
+   * This is the public method that components should call
+   */
+  refreshCurrentUser(user: User): void {
+    console.log('Refreshing current user:', user);
+    this.updateCurrentUser(user);
   }
 
   /**

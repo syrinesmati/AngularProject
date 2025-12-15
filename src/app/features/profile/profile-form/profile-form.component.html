@@ -1,0 +1,111 @@
+<!-- profile-form.component.html - Add loading state -->
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+  <div class="w-full max-w-md animate-scale-in">
+    <div class="rounded-xl border border-border bg-card shadow-2xl overflow-hidden">
+      <div class="p-6 border-b border-border flex items-center justify-between bg-gradient-to-r from-primary/10 to-transparent">
+        <div>
+          <h1 class="text-xl font-semibold text-foreground flex items-center gap-2">
+            <svg class="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A13.937 13.937 0 0112 15c2.5 0 4.847.655 6.879 1.804M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            Edit Profile
+          </h1>
+          <p class="text-sm text-muted-foreground mt-1">Update your personal information</p>
+        </div>
+        <button type="button" (click)="closeModal()" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition">
+          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      @if (isLoading()) {
+        <!-- Loading State -->
+        <div class="p-6 flex flex-col items-center justify-center min-h-96">
+          <div class="flex flex-col items-center gap-3">
+            <div class="animate-spin rounded-full h-8 w-8 border border-primary border-t-transparent"></div>
+            <p class="text-sm text-muted-foreground">Loading your profile...</p>
+          </div>
+        </div>
+      } @else {
+        <form [formGroup]="form" (ngSubmit)="submit()" class="p-6 space-y-4">
+          @if (errorMessage()) {
+            <div class="rounded-lg bg-destructive/10 border border-destructive p-3 text-sm text-destructive animate-shake">{{ errorMessage() }}</div>
+          }
+
+          <div class="space-y-2">
+            <label class="text-sm font-medium">First Name</label>
+            <input type="text" formControlName="firstName"
+              [class]="firstName.invalid && (firstName.dirty || firstName.touched) ? 'flex h-10 w-full rounded-lg border border-destructive bg-background px-3 text-sm' : 'flex h-10 w-full rounded-lg border border-input bg-background px-3 text-sm'"/>
+            @if (firstName.invalid && (firstName.dirty || firstName.touched)) {
+              <p class="text-xs text-destructive">First name is required</p>
+            }
+          </div>
+
+          <div class="space-y-2">
+            <label class="text-sm font-medium">Last Name</label>
+            <input type="text" formControlName="lastName"
+              [class]="lastName.invalid && (lastName.dirty || lastName.touched) ? 'flex h-10 w-full rounded-lg border border-destructive bg-background px-3 text-sm' : 'flex h-10 w-full rounded-lg border border-input bg-background px-3 text-sm'"/>
+            @if (lastName.invalid && (lastName.dirty || lastName.touched)) {
+              <p class="text-xs text-destructive">Last name is required</p>
+            }
+          </div>
+
+          <!-- Avatar File Picker -->
+          <div class="space-y-2">
+            <label class="text-sm font-medium">Avatar</label>
+            
+            <!-- Preview -->
+            @if (avatarPreview()) {
+              <div class="flex items-center gap-4 p-3 border border-border rounded-lg bg-muted/30">
+                <img [src]="avatarPreview()" alt="Avatar preview" class="h-16 w-16 rounded-full object-cover border-2 border-primary" />
+                <div class="flex-1">
+                  <p class="text-sm font-medium">{{ selectedFileName() }}</p>
+                  <p class="text-xs text-muted-foreground">{{ getFileSize() }}</p>
+                </div>
+                <button type="button" (click)="removeAvatar()" class="text-destructive hover:text-destructive/80 transition">
+                  <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              </div>
+            }
+
+            <!-- File Input -->
+            <div class="flex items-center gap-2">
+              <input
+                #fileInput
+                type="file"
+                accept="image/png,image/jpeg,image/jpg,image/gif"
+                (change)="onFileSelected($event)"
+                class="hidden"
+              />
+              <button
+                type="button"
+                (click)="fileInput.click()"
+                class="flex-1 h-10 px-4 rounded-lg border-2 border-dashed border-input hover:border-primary bg-background hover:bg-muted/50 transition flex items-center justify-center gap-2 text-sm"
+              >
+                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                @if (avatarPreview()) {
+                  <span>Change Image</span>
+                } @else {
+                  <span>Choose Image</span>
+                }
+              </button>
+            </div>
+
+            @if (uploadError()) {
+              <p class="text-xs text-destructive">{{ uploadError() }}</p>
+            }
+            <p class="text-xs text-muted-foreground">PNG, JPG, GIF up to 2MB</p>
+          </div>
+
+          <div class="flex items-center gap-3 pt-2">
+            <button type="button" (click)="closeModal()" class="h-10 px-4 rounded-lg border-2 border-input text-foreground hover:bg-muted transition">Cancel</button>
+            <button type="submit" [disabled]="form.invalid || isSubmitting()" class="h-10 px-4 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition">
+              @if (isSubmitting()) { Saving... } @else { Save Changes }
+            </button>
+          </div>
+        </form>
+      }
+    </div>
+  </div>
+</div>

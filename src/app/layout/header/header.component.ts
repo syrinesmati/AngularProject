@@ -1,4 +1,5 @@
-import { Component, inject } from '@angular/core';
+// header.component.ts - Add hasAvatar() helper and error handling
+import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
@@ -26,6 +27,7 @@ export class HeaderComponent {
 
   currentUser = this.authService.currentUserSignal;
   showUserDropdown = false;
+  private avatarError = signal(false);
 
   getInitials(): string {
     const user = this.currentUser();
@@ -44,17 +46,28 @@ export class HeaderComponent {
     return user ? `${user.firstName} ${user.lastName}` : '';
   }
 
+  hasAvatar(): boolean {
+    const user = this.currentUser();
+    return !!(user?.avatar && !this.avatarError());
+  }
+
+  onAvatarError(event: Event): void {
+    // Fallback to initials if image fails to load
+    this.avatarError.set(true);
+    (event.target as HTMLImageElement).style.display = 'none';
+  }
+
   toggleUserDropdown() {
     this.showUserDropdown = !this.showUserDropdown;
   }
 
   navigateToProfile() {
-    this.router.navigate(['/settings']);
+    this.router.navigate(['/profile/edit']);
     this.showUserDropdown = false;
   }
 
   navigateToSettings() {
-    this.router.navigate(['/settings']);
+    this.router.navigate(['/settings/edit']);
     this.showUserDropdown = false;
   }
 

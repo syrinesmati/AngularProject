@@ -17,11 +17,22 @@
           (click)="toggleUserDropdown()"
           class="flex items-center gap-2 px-2 rounded-md hover:bg-secondary transition-colors"
         >
-          <div
-            class="h-8 w-8 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-medium"
-          >
-            {{ getInitials() }}
-          </div>
+          @if (hasAvatar()) {
+            <!-- Show avatar image if available -->
+            <img
+              [src]="currentUser()?.avatar"
+              [alt]="getUserName()"
+              class="h-8 w-8 rounded-full object-cover border border-border"
+              (error)="onAvatarError($event)"
+            />
+          } @else {
+            <!-- Show initials fallback -->
+            <div
+              class="h-8 w-8 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-medium"
+            >
+              {{ getInitials() }}
+            </div>
+          }
           <span class="hidden text-sm font-medium md:inline-block">
             {{ getUserName() }}
           </span>

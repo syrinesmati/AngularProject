@@ -57,6 +57,14 @@ export const routes: Routes = [
             resolve: { projects: projectsResolver },
           },
           {
+            path: 'new',
+            loadComponent: () =>
+              import('./features/projects/project-form/project-form.component').then(
+                (m) => m.ProjectFormComponent
+              ),
+            data: { title: 'Create Project' },
+          },
+          {
             path: ':projectId',
             canActivate: [projectMemberGuard],
             children: [
@@ -84,7 +92,39 @@ export const routes: Routes = [
               import('./features/tasks/tasks/tasks.component').then((m) => m.TasksComponent),
             data: { title: 'My Tasks' },
           },
+          {
+            path: 'new',
+            loadComponent: () =>
+              import('./features/tasks/task-form/task-form.component').then(
+                (m) => m.TaskFormComponent
+              ),
+            data: { title: 'Create Task' },
+          },
         ],
+      },
+
+
+      {
+        path: 'profile/edit',
+        loadComponent: () => import('./features/profile/profile-form/profile-form.component').then(m => m.ProfileFormComponent),
+        data: { title: 'Edit Profile' },
+      },
+      {
+        path: 'settings/edit',
+        loadComponent: () => import('./features/settings/settings-form/settings-form.component').then(m => m.SettingsFormComponent),
+        data: { title: 'Settings' },
+      },
+
+
+      {
+        path: 'profile',
+        redirectTo: 'profile/edit',
+        pathMatch: 'full',
+      },
+      {
+        path: 'settings',
+        redirectTo: 'settings/edit',
+        pathMatch: 'full',
       },
 
       // ============================================
