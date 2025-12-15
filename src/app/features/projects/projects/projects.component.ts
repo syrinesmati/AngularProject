@@ -11,11 +11,11 @@ import { ProjectCardComponent } from '../project-card/project-card.component';
 import { ProjectModalComponent } from '../project-modal/project-modal.component';
 
 @Component({
-  selector: 'app-projects',
+  selector: 'app-projects.component',
   standalone: true,
   imports: [CommonModule, FormsModule, ProjectCardComponent, ProjectModalComponent],
   templateUrl: './projects.component.html',
-  styleUrl: './projects.component.css',
+  styleUrls: ['./projects.component.css'],
 })
 export class ProjectsComponent {
   private projectsService = inject(ProjectsService);

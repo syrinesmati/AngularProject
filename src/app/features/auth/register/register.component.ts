@@ -1,13 +1,20 @@
 import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, ReactiveFormsModule, Validators, AbstractControl, ValidationErrors } from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { RegisterDto } from '../../../core/models/user.model';
+import {
+  matchPasswordValidator,
+  noSpacesValidator,
+  passwordStrengthValidator,
+  UniqueEmailValidator,
+} from '../../../shared/validators';
+
 @Component({
-selector: 'app-register',
-standalone: true,
-imports: [CommonModule, ReactiveFormsModule, RouterLink],
+  selector: 'app-register',
+  standalone: true,
+  imports: [CommonModule, ReactiveFormsModule, RouterLink],
   templateUrl: './register.component.html',
   styleUrl: './register.component.css',
 })
@@ -15,16 +22,39 @@ export class RegisterComponent {
   private fb = inject(FormBuilder);
   private authService = inject(AuthService);
   private router = inject(Router);
+  private uniqueEmailValidator = inject(UniqueEmailValidator);
+
   isSubmitting = signal(false);
   errorMessage = signal<string>('');
+  passwordVisible = signal(false);
+  confirmPasswordVisible = signal(false);
 
-  registerForm = this.fb.group({
-    firstName: ['', [Validators.required]],
-    lastName: ['', [Validators.required]],
-    email: ['', [Validators.required, Validators.email]],
-    password: ['', [Validators.required, Validators.minLength(6)]],
-    confirmPassword: ['', [Validators.required]]
-  }, { validators: passwordMatchValidator });
+  registerForm = this.fb.group(
+    {
+      firstName: ['', [Validators.required, noSpacesValidator({ trim: true })]],
+      lastName: ['', [Validators.required, noSpacesValidator({ trim: true })]],
+
+      // Validate email on blur (includes async unique-email)
+      email: this.fb.control('', {
+        validators: [Validators.required, Validators.email, noSpacesValidator({ allowInternal: false })],
+        asyncValidators: [this.uniqueEmailValidator.validate()],
+        updateOn: 'blur',
+      }),
+
+      // Validate password on blur to show strength errors after finishing typing
+      password: this.fb.control('', {
+        validators: [Validators.required, passwordStrengthValidator()],
+        updateOn: 'blur',
+      }),
+
+      // Validate confirmPassword on blur; match handled at form level
+      confirmPassword: this.fb.control('', {
+        validators: [Validators.required],
+        updateOn: 'blur',
+      }),
+    },
+    { validators: matchPasswordValidator('password', 'confirmPassword') }
+  );
 
   get firstName() { return this.registerForm.get('firstName')!; }
   get lastName() { return this.registerForm.get('lastName')!; }
@@ -32,33 +62,35 @@ export class RegisterComponent {
   get password() { return this.registerForm.get('password')!; }
   get confirmPassword() { return this.registerForm.get('confirmPassword')!; }
 
-  onSubmit(): void {
-    if (this.registerForm. valid) {
-      this.isSubmitting.set(true);
-      this.errorMessage.set('');
-      const { firstName, lastName, email, password } = this. registerForm.value;
-      const registerDto: RegisterDto = { firstName: firstName!, lastName: lastName!, email: email!, password: password! };
-      this.authService.register(registerDto).subscribe({
-        next: () => {
-          this.router.navigate(['/dashboard']);
-        },
-        error: (error) => {
-          this.errorMessage.set(error. message);
-          this.isSubmitting.set(false);
-        }
-      });
+  togglePasswordVisibility(field: 'password' | 'confirmPassword'): void {
+    if (field === 'password') {
+      this.passwordVisible.update((current) => !current);
     } else {
-      this.registerForm.markAllAsTouched();
+      this.confirmPasswordVisible.update((current) => !current);
     }
   }
-}
 
-
-  function passwordMatchValidator(control: AbstractControl): ValidationErrors | null {
-  const password = control.get('password');
-  const confirmPassword = control. get('confirmPassword');
-  if (!password || !confirmPassword) {
-  return null;
+  onSubmit(): void {
+    if (this.registerForm.valid) {
+      this.isSubmitting.set(true);
+      this.errorMessage.set('');
+      const { firstName, lastName, email, password } = this.registerForm.value;
+      const registerDto: RegisterDto = {
+        firstName: firstName!,
+        lastName: lastName!,
+        email: email!,
+        password: password!,
+      };
+      this.authService.register(registerDto).subscribe({
+        next: () => this.router.navigate(['/dashboard']),
+        error: (error) => {
+          this.errorMessage.set(error.message);
+          this.isSubmitting.set(false);
+        },
+      });
+    } else {
+      // Avoid forcing blur-only validators to show errors on submit
+      // this.registerForm.markAllAsTouched();
+    }
   }
-  return password.value === confirmPassword.value ? null : { passwordMismatch: true };
 }

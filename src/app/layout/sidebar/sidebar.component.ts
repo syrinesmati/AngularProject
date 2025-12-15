@@ -38,7 +38,7 @@ export class SidebarComponent {
   bottomNavItems: NavItem[] = [
     { path: '/search', label: 'Search', icon: 'Search' },
     { path: '/notifications', label: 'Notifications', icon: 'Bell', badge: 2 },
-    { path: '/settings', label: 'Settings', icon: 'Settings' },
+    { path: '/settings/edit', label: 'Settings', icon: 'Settings' },
   ];
 
   toggleCollapse() {

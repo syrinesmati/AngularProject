@@ -28,11 +28,11 @@
                 type="text"
                 formControlName="firstName"
                 placeholder="John"
-                [class]="firstName.invalid && firstName.touched 
-                  ? 'flex h-10 w-full rounded-lg border border-destructive bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-destructive' 
+                [class]="firstName.invalid && (firstName.dirty || firstName.touched)
+                  ? 'flex h-10 w-full rounded-lg border border-destructive bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-destructive'
                   : 'flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary'"
               />
-              @if (firstName.invalid && firstName.touched) {
+              @if (firstName.invalid && (firstName.dirty || firstName.touched)) {
                 <p class="text-xs text-destructive">Required</p>
               }
             </div>
@@ -44,11 +44,11 @@
                 type="text"
                 formControlName="lastName"
                 placeholder="Doe"
-                [class]="lastName.invalid && lastName.touched 
-                  ? 'flex h-10 w-full rounded-lg border border-destructive bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-destructive' 
+                [class]="lastName.invalid && (lastName.dirty || lastName.touched)
+                  ? 'flex h-10 w-full rounded-lg border border-destructive bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-destructive'
                   : 'flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary'"
               />
-              @if (lastName.invalid && lastName.touched) {
+              @if (lastName.invalid && (lastName.dirty || lastName.touched)) {
                 <p class="text-xs text-destructive">Required</p>
               }
             </div>
@@ -62,18 +62,21 @@
               type="email"
               formControlName="email"
               placeholder="you@example.com"
-              [class]="email.invalid && email.touched 
-                ? 'flex h-10 w-full rounded-lg border border-destructive bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-destructive' 
+              [class]="email.invalid && (email.dirty || email.touched)
+                ? 'flex h-10 w-full rounded-lg border border-destructive bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-destructive'
                 : 'flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary'"
             />
-            @if (email.invalid && email.touched) {
-              <p class="text-xs text-destructive">
-                @if (email.errors?.['required']) {
-                  <span>Email is required</span>
+            @if (email.pending) {
+              <p class="text-xs text-muted-foreground">Checking availability...</p>
+            }
+            @if (email.invalid && (email.dirty || email.touched)) {
+              <p class="text-xs text-destructive space-y-0.5">
+                @if (email.errors?.['required']) { <span>Email is required</span> }
+                @if (email.errors?.['email']) { <span>Please enter a valid email</span> }
+                @if (email.errors?.['leadingOrTrailingSpaces'] || email.errors?.['containsSpaces']) {
+                  <span>No spaces allowed</span>
                 }
-                @if (email.errors?.['email']) {
-                  <span>Please enter a valid email</span>
-                }
+                @if (email.errors?.['emailTaken']) { <span>Email is already registered</span> }
               </p>
             }
           </div>
@@ -81,23 +84,50 @@
           <!-- Password -->
           <div class="space-y-2">
             <label for="password" class="text-sm font-medium text-foreground">Password</label>
-            <input
-              id="password"
-              type="password"
-              formControlName="password"
-              placeholder="••••••••"
-              [class]="password.invalid && password.touched 
-                ? 'flex h-10 w-full rounded-lg border border-destructive bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-destructive' 
-                : 'flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary'"
-            />
-            @if (password.invalid && password.touched) {
-              <p class="text-xs text-destructive">
-                @if (password.errors?.['required']) {
-                  <span>Password is required</span>
+            <div class="relative">
+              <input
+                id="password"
+                [type]="passwordVisible() ? 'text' : 'password'"
+                formControlName="password"
+                placeholder="••••••••"
+                [class]="password.invalid && (password.dirty || password.touched)
+                  ? 'flex h-10 w-full rounded-lg border border-destructive bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-destructive pr-12'
+                  : 'flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary pr-12'"
+              />
+              <button
+                type="button"
+                [attr.aria-label]="passwordVisible() ? 'Hide password' : 'Show password'"
+                class="absolute inset-y-0 right-2 inline-flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition"
+                (click)="togglePasswordVisibility('password')"
+              >
+                @if (passwordVisible()) {
+                  <!-- Eye Off Icon -->
+                  <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M10.477 10.485A3 3 0 0115 12a3 3 0 01-4.244 2.828" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6.228 6.228C4.573 7.322 3.27 8.994 2.458 12 3.732 16.057 7.523 19 12 19c2.028 0 3.917-.573 5.556-1.558" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.88 9.88L6.228 6.228" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M14.12 14.12l3.653 3.653" />
+                  </svg>
+                } @else {
+                  <!-- Eye Icon -->
+                  <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
                 }
-                @if (password.errors?.['minlength']) {
-                  <span>Password must be at least 6 characters</span>
+              </button>
+            </div>
+            @if (password.invalid && (password.dirty || password.touched)) {
+              <p class="text-xs text-destructive space-y-0.5">
+                @if (password.errors?.['required']) { <span>Password is required</span> }
+                @if (password.errors?.['passwordStrength']?.['minLength']) {
+                  <span>At least {{ password.errors?.['passwordStrength']?.['minLength']?.requiredLength || 8 }} characters</span>
                 }
+                @if (password.errors?.['passwordStrength']?.['requireUppercase']) { <span>Include an uppercase letter</span> }
+                @if (password.errors?.['passwordStrength']?.['requireLowercase']) { <span>Include a lowercase letter</span> }
+                @if (password.errors?.['passwordStrength']?.['requireNumber']) { <span>Include a number</span> }
+                @if (password.errors?.['passwordStrength']?.['requireSpecialChar']) { <span>Include a special character</span> }
               </p>
             }
           </div>
@@ -105,17 +135,47 @@
           <!-- Confirm Password -->
           <div class="space-y-2">
             <label for="confirmPassword" class="text-sm font-medium text-foreground">Confirm Password</label>
-            <input
-              id="confirmPassword"
-              type="password"
-              formControlName="confirmPassword"
-              placeholder="••••••••"
-              [class]="(confirmPassword.invalid || registerForm.errors?.['passwordMismatch']) && confirmPassword.touched 
-                ? 'flex h-10 w-full rounded-lg border border-destructive bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-destructive' 
-                : 'flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary'"
-            />
-            @if (registerForm.errors?.['passwordMismatch'] && confirmPassword.touched) {
-              <p class="text-xs text-destructive">Passwords do not match</p>
+            <div class="relative">
+              <input
+                id="confirmPassword"
+                [type]="confirmPasswordVisible() ? 'text' : 'password'"
+                formControlName="confirmPassword"
+                placeholder="••••••••"
+                [class]="((confirmPassword.invalid || confirmPassword.errors?.['passwordMismatch'] || registerForm.errors?.['passwordMismatch']) && (confirmPassword.dirty || confirmPassword.touched))
+                  ? 'flex h-10 w-full rounded-lg border border-destructive bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-destructive pr-12'
+                  : 'flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary pr-12'"
+              />
+              <button
+                type="button"
+                [attr.aria-label]="confirmPasswordVisible() ? 'Hide confirm password' : 'Show confirm password'"
+                class="absolute inset-y-0 right-2 inline-flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition"
+                (click)="togglePasswordVisibility('confirmPassword')"
+              >
+                @if (confirmPasswordVisible()) {
+                  <!-- Eye Off Icon -->
+                  <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M10.477 10.485A3 3 0 0115 12a3 3 0 01-4.244 2.828" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6.228 6.228C4.573 7.322 3.27 8.994 2.458 12 3.732 16.057 7.523 19 12 19c2.028 0 3.917-.573 5.556-1.558" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.88 9.88L6.228 6.228" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M14.12 14.12l3.653 3.653" />
+                  </svg>
+                } @else {
+                  <!-- Eye Icon -->
+                  <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                }
+              </button>
+            </div>
+            @if ((confirmPassword.invalid || confirmPassword.errors?.['passwordMismatch'] || registerForm.errors?.['passwordMismatch']) && (confirmPassword.dirty || confirmPassword.touched)) {
+              <p class="text-xs text-destructive space-y-0.5">
+                @if (confirmPassword.errors?.['required']) { <span>Confirmation is required</span> }
+                @if (confirmPassword.errors?.['passwordMismatch'] || registerForm.errors?.['passwordMismatch']) {
+                  <span>Passwords do not match</span>
+                }
+              </p>
             }
           </div>
 
