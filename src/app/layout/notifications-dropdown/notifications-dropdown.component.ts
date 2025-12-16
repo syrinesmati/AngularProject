@@ -1,5 +1,6 @@
 import { Component, signal, inject, computed, effect, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { formatDistanceToNow } from 'date-fns';
 import { LucideIconComponent } from '../../shared/components/lucide-icon/lucide-icon.component';
 import { NotificationsService } from '../../core/services/notifications.service';
@@ -8,7 +9,7 @@ import { Notification, NotificationType } from '../../core/models/notification.m
 @Component({
   selector: 'app-notifications-dropdown',
   standalone: true,
-  imports: [CommonModule, LucideIconComponent],
+  imports: [CommonModule, RouterLink, LucideIconComponent],
   templateUrl: './notifications-dropdown.component.html',
   styleUrls: ['./notifications-dropdown.component.css'],
 })
