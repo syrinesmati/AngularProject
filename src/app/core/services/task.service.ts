@@ -38,6 +38,16 @@ export interface FilterTaskDto {
   limit?: number;
 }
 
+export interface TaskListResponse {
+  data: Task[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
 export interface ApiResponse<T> {
   statusCode: number;
   message: string;
@@ -73,7 +83,7 @@ export class TasksService extends BaseService {
     const labelFilter = this.labelFilterSignal();
     const searchFilter = this.searchFilterSignal().toLowerCase();
 
-    return tasks.filter(task => {
+    return tasks.filter((task) => {
       // Status filter
       if (statusFilter && task.status !== statusFilter) {
         return false;
@@ -85,10 +95,10 @@ export class TasksService extends BaseService {
       }
 
       // Assignee filter
-      if (assigneeFilter && !task.assignees?.some(assignee => assignee.id === assigneeFilter)) {
+      if (assigneeFilter && !task.assignees?.some((assignee) => assignee.id === assigneeFilter)) {
         return false;
       }
-      if (labelFilter && !task.labels?.some(l => l.id === labelFilter)) return false;
+      if (labelFilter && !task.labels?.some((l) => l.id === labelFilter)) return false;
 
       // Search filter (title and description)
       if (searchFilter) {
@@ -104,33 +114,39 @@ export class TasksService extends BaseService {
   });
 
   // Additional computed properties
-  todoTasks = computed(() => this.tasksSignal().filter(t => t.status === TaskStatus.TODO));
-  inProgressTasks = computed(() => this.tasksSignal().filter(t => t.status === TaskStatus.IN_PROGRESS));
-  doneTasks = computed(() => this.tasksSignal().filter(t => t.status === TaskStatus.DONE));
-  highPriorityTasks = computed(() => this.tasksSignal().filter(t => t.priority === TaskPriority.HIGH || t.priority === TaskPriority.URGENT));
+  todoTasks = computed(() => this.tasksSignal().filter((t) => t.status === TaskStatus.TODO));
+  inProgressTasks = computed(() =>
+    this.tasksSignal().filter((t) => t.status === TaskStatus.IN_PROGRESS)
+  );
+  doneTasks = computed(() => this.tasksSignal().filter((t) => t.status === TaskStatus.DONE));
+  highPriorityTasks = computed(() =>
+    this.tasksSignal().filter(
+      (t) => t.priority === TaskPriority.HIGH || t.priority === TaskPriority.URGENT
+    )
+  );
 
   // Required computed signals
   tasksGroupedByStatus = computed(() => {
     const tasks = this.tasksSignal();
     return {
-      [TaskStatus.TODO]: tasks.filter(t => t.status === TaskStatus.TODO),
-      [TaskStatus.IN_PROGRESS]: tasks.filter(t => t.status === TaskStatus.IN_PROGRESS),
-      [TaskStatus.IN_REVIEW]: tasks.filter(t => t.status === TaskStatus.IN_REVIEW),
-      [TaskStatus.DONE]: tasks.filter(t => t.status === TaskStatus.DONE),
+      [TaskStatus.TODO]: tasks.filter((t) => t.status === TaskStatus.TODO),
+      [TaskStatus.IN_PROGRESS]: tasks.filter((t) => t.status === TaskStatus.IN_PROGRESS),
+      [TaskStatus.IN_REVIEW]: tasks.filter((t) => t.status === TaskStatus.IN_REVIEW),
+      [TaskStatus.DONE]: tasks.filter((t) => t.status === TaskStatus.DONE),
     };
   });
 
   userTasksCount = computed(() => {
     const currentUser = this.usersService.currentUserSignal();
     if (!currentUser) return 0;
-    return this.tasksSignal().filter(task =>
-      task.assignees?.some(assignee => assignee.id === currentUser.id)
+    return this.tasksSignal().filter((task) =>
+      task.assignees?.some((assignee) => assignee.id === currentUser.id)
     ).length;
   });
 
   overdueTasks = computed(() => {
     const now = new Date();
-    return this.tasksSignal().filter(task => {
+    return this.tasksSignal().filter((task) => {
       if (!task.dueDate) return false;
       const dueDate = new Date(task.dueDate);
       return dueDate < now && task.status !== TaskStatus.DONE;
@@ -199,12 +215,12 @@ export class TasksService extends BaseService {
       if (filter.limit) params = params.set('limit', filter.limit.toString());
     }
 
-    return this.http.get<ApiResponse<Task[]>>(this.buildUrl('/tasks/my-tasks'), {
-      params,
-      withCredentials: true,
-    }).pipe(
-      map(response => response.data)
-    );
+    return this.http
+      .get<TaskListResponse>(this.buildUrl('/tasks/my-tasks'), {
+        params,
+        withCredentials: true,
+      })
+      .pipe(map((response) => response.data));
   }
 
   /**
@@ -301,7 +317,7 @@ export class TasksService extends BaseService {
     this.errorSignal.set(null);
     return this.createTask(dto).pipe(
       tap((newTask) => {
-        this.tasksSignal.update(tasks => [...tasks, newTask]);
+        this.tasksSignal.update((tasks) => [...tasks, newTask]);
         this.loadingSignal.set(false);
       }),
       catchError((error) => {
@@ -320,9 +336,7 @@ export class TasksService extends BaseService {
     this.errorSignal.set(null);
     return this.updateTask(id, dto).pipe(
       tap((updatedTask) => {
-        this.tasksSignal.update(tasks =>
-          tasks.map(t => t.id === id ? updatedTask : t)
-        );
+        this.tasksSignal.update((tasks) => tasks.map((t) => (t.id === id ? updatedTask : t)));
         this.loadingSignal.set(false);
       }),
       catchError((error) => {
@@ -341,7 +355,7 @@ export class TasksService extends BaseService {
     this.errorSignal.set(null);
     return this.deleteTask(id).pipe(
       tap(() => {
-        this.tasksSignal.update(tasks => tasks.filter(t => t.id !== id));
+        this.tasksSignal.update((tasks) => tasks.filter((t) => t.id !== id));
         this.loadingSignal.set(false);
       }),
       catchError((error) => {
@@ -367,9 +381,7 @@ export class TasksService extends BaseService {
     this.errorSignal.set(null);
     return this.assignUser(taskId, userId).pipe(
       tap((updatedTask) => {
-        this.tasksSignal.update(tasks =>
-          tasks.map(t => t.id === taskId ? updatedTask : t)
-        );
+        this.tasksSignal.update((tasks) => tasks.map((t) => (t.id === taskId ? updatedTask : t)));
         this.loadingSignal.set(false);
       }),
       catchError((error) => {
@@ -389,12 +401,12 @@ export class TasksService extends BaseService {
     return this.unassignUser(taskId, userId).pipe(
       tap(() => {
         // Update the task in signals by removing the assignee
-        this.tasksSignal.update(tasks =>
-          tasks.map(task => {
+        this.tasksSignal.update((tasks) =>
+          tasks.map((task) => {
             if (task.id === taskId) {
               return {
                 ...task,
-                assignees: task.assignees?.filter(assignee => assignee.id !== userId) || []
+                assignees: task.assignees?.filter((assignee) => assignee.id !== userId) || [],
               };
             }
             return task;
@@ -477,6 +489,6 @@ export class TasksService extends BaseService {
   }
 
   getTasks(): Task[] {
-  return this.tasksSignal();
-}
+    return this.tasksSignal();
+  }
 }

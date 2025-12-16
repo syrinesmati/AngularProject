@@ -1,1 +1,129 @@
-<p>board.component works!</p>
+<div class="space-y-6 animate-fade-in h-[calc(100vh-8rem)]">
+  <!-- Header -->
+  <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+      <h1 class="text-2xl font-semibold text-foreground">Board</h1>
+      <p class="text-muted-foreground">
+        Drag and drop tasks between columns @if (isLoading()) {
+        <span class="ml-2 text-blue-600">Loading...</span>
+        }
+      </p>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <!-- Project Filter -->
+      <select
+        class="w-[180px] px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+        [ngModel]="selectedProjectId()"
+        (ngModelChange)="onProjectFilterChange($event)"
+        [disabled]="isLoading()"
+      >
+        <option value="all">All Projects</option>
+        @for (project of userProjects(); track project.id) {
+        <option [value]="project.id">{{ project.name }}</option>
+        }
+      </select>
+
+      <!-- New Task Button -->
+      <button
+        class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        (click)="openCreateModal()"
+        [disabled]="isLoading()"
+      >
+        <span class="text-lg">+</span>
+        <span>New Task</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading Spinner -->
+  @if (isLoading()) {
+  <div class="flex items-center justify-center h-64">
+    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+  </div>
+  }
+
+  <!-- Kanban Board -->
+  @if (!isLoading()) {
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 h-[calc(100%-5rem)] overflow-x-auto">
+    @for (column of columns; track column.id) {
+    <div
+      class="flex flex-col rounded-xl border-2 border-dashed p-4 transition-all duration-200 min-w-[300px]"
+      [ngClass]="[
+        column.className,
+        dragOverColumn() === column.id ? 'ring-2 ring-blue-500 ring-offset-2 border-blue-500' : ''
+      ]"
+      cdkDropList
+      [id]="'column-' + column.id"
+      [cdkDropListData]="getTasksByStatus(column.id)"
+      [cdkDropListConnectedTo]="columnIds()"
+      (cdkDropListDropped)="onDrop($event, column.id)"
+      (cdkDropListEntered)="onDragOver(column.id)"
+      (cdkDropListExited)="onDragLeave()"
+    >
+      <!-- Column Header -->
+      <div class="mb-4 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <h2 class="font-medium text-gray-900">{{ column.title }}</h2>
+          <span
+            class="flex h-5 min-w-5 items-center justify-center rounded-full bg-gray-200 px-1.5 text-xs font-medium text-gray-700"
+          >
+            {{ getTasksByStatus(column.id).length }}
+          </span>
+        </div>
+      </div>
+
+      <!-- Tasks -->
+      <div class="flex-1 space-y-3 overflow-y-auto scrollbar-thin">
+        @if (getTasksByStatus(column.id).length === 0) {
+        <div
+          class="flex h-32 items-center justify-center rounded-lg border-2 border-dashed border-gray-300"
+        >
+          <p class="text-sm text-gray-500">No tasks</p>
+        </div>
+        } @else { @for (task of getTasksByStatus(column.id); track task.id) {
+        <div
+          cdkDrag
+          [cdkDragData]="task"
+          (cdkDragStarted)="onDragStart(task)"
+          (cdkDragEnded)="onDragEnd()"
+          class="cursor-grab active:cursor-grabbing"
+        >
+          <!-- Task Card Component -->
+          <app-task-card
+            [task]="task"
+            [showProject]="selectedProjectId() === 'all'"
+            [isDragging]="false"
+            (cardClick)="openTaskDetail(task)"
+          />
+
+          <!-- Drag Preview -->
+          <div
+            *cdkDragPreview
+            class="bg-white rounded-lg border-2 border-blue-500 p-4 shadow-lg opacity-90"
+          >
+            <h3 class="font-medium text-gray-900">{{ task.title }}</h3>
+          </div>
+        </div>
+        } }
+      </div>
+    </div>
+    }
+  </div>
+  }
+</div>
+
+<!-- Modals (to be implemented by Person 1 - Tasks Module) -->
+<!--
+<app-task-modal
+  [task]="selectedTask()"
+  [isOpen]="selectedTask() !== null"
+  (close)="closeTaskDetail()">
+</app-task-modal>
+
+<app-task-modal
+  [isOpen]="isCreateModalOpen()"
+  [defaultProjectId]="selectedProjectId() !== 'all' ? selectedProjectId() : undefined"
+  (close)="closeCreateModal()">
+</app-task-modal>
+-->
