@@ -189,8 +189,13 @@ export class ProjectsService extends BaseService {
       this.logger.info(`Fetching members for project ${projectId} from API`);
       this.projectMembersCache.set(
         projectId,
-        this.http.get<{ data: ProjectMember[] }>(this.buildUrl(`/projects/${projectId}/members`)).pipe(
-          map(response => response.data),
+        this.http.get<any>(this.buildUrl(`/projects/${projectId}/members`)).pipe(
+          map(response => {
+            // Response is already wrapped by backend interceptor as { statusCode, message, data, timestamp }
+            const members = response.data || response;
+            this.logger.info(`Members for project ${projectId}:`, members);
+            return members;
+          }),
           tap(() => this.logger.info(`Members for project ${projectId} cached`)),
           shareReplay(1),
           catchError((error) => {
@@ -209,13 +214,12 @@ export class ProjectsService extends BaseService {
    * Add a member to the project with cache invalidation
    */
   addMember(projectId: string, dto: AddMemberDto): Observable<ProjectMember> {
-    return this.http.post<{ data: ProjectMember }>(this.buildUrl(`/projects/${projectId}/members`), dto).pipe(
+    return this.http.post<ApiResponse<ProjectMember>>(this.buildUrl(`/projects/${projectId}/members`), dto).pipe(
       map(response => response.data),
       tap(() => {
+        // Only invalidate members cache for this project, not the whole projects list
         this.invalidateProjectMembersCache(projectId);
-        this.invalidateProjectCache(projectId);
-        this.invalidateAllProjectsCache();
-        this.logger.info(`Member added to project ${projectId}, cache invalidated`);
+        this.logger.info(`Member added to project ${projectId}, members cache invalidated`);
       }),
       catchError((error) => {
         this.logger.error('Failed to add member: ' + error.message);
@@ -232,13 +236,14 @@ export class ProjectsService extends BaseService {
     memberId: string,
     dto: UpdateMemberDto
   ): Observable<ProjectMember> {
-    return this.http.patch<ProjectMember>(
+    return this.http.patch<ApiResponse<ProjectMember>>(
       this.buildUrl(`/projects/${projectId}/members/${memberId}`),
       dto
     ).pipe(
+      map(response => response.data),
       tap(() => {
         this.invalidateProjectMembersCache(projectId);
-        this.logger.info(`Member ${memberId} role updated, cache invalidated`);
+        this.logger.info(`Member ${memberId} role updated, members cache invalidated`);
       }),
       catchError((error) => {
         this.logger.error('Failed to update member role: ' + error.message);
@@ -251,12 +256,12 @@ export class ProjectsService extends BaseService {
    * Remove a member from the project with cache invalidation
    */
   removeMember(projectId: string, memberId: string): Observable<void> {
-    return this.http.delete<void>(this.buildUrl(`/projects/${projectId}/members/${memberId}`)).pipe(
+    return this.http.delete<ApiResponse<void>>(this.buildUrl(`/projects/${projectId}/members/${memberId}`)).pipe(
+      map(response => response.data),
       tap(() => {
+        // Only invalidate members cache for this project
         this.invalidateProjectMembersCache(projectId);
-        this.invalidateProjectCache(projectId);
-        this.invalidateAllProjectsCache();
-        this.logger.info(`Member ${memberId} removed, cache invalidated`);
+        this.logger.info(`Member ${memberId} removed, members cache invalidated`);
       }),
       catchError((error) => {
         this.logger.error('Failed to remove member: ' + error.message);
@@ -331,8 +336,6 @@ export class ProjectsService extends BaseService {
     this.projectCache.clear();
     this.projectMembersCache.clear();
     this.logger.info('All project caches cleared');
-    this.projectMembersCache.clear();
-    this.logger.info('All project caches cleared');
-}
+  }
 }
 

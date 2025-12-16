@@ -160,10 +160,10 @@
 
             @if (showOwnerDropdown()) {
             <div class="absolute z-10 w-full mt-1 bg-card border border-border rounded-md shadow-lg max-h-56 overflow-auto">
-              @if (availableUsers().length === 0) {
+              @if (isUsersLoading()) {
               <div class="px-3 py-2 text-sm text-muted-foreground">Loading users...</div>
               } @else {
-                @for (user of availableUsers(); track user.id) {
+                @for (user of getAvailableUsers(); track user.id) {
                 <label
                   class="flex items-center px-3 py-2 hover:bg-muted cursor-pointer transition-colors"
                 >
@@ -232,10 +232,10 @@
 
             @if (showEditorDropdown()) {
             <div class="absolute z-10 w-full mt-1 bg-card border border-border rounded-md shadow-lg max-h-56 overflow-auto">
-              @if (availableUsers().length === 0) {
+              @if (isUsersLoading()) {
               <div class="px-3 py-2 text-sm text-muted-foreground">Loading users...</div>
               } @else {
-                @for (user of availableUsers(); track user.id) {
+                @for (user of getAvailableUsers(); track user.id) {
                 <label
                   class="flex items-center px-3 py-2 hover:bg-muted cursor-pointer transition-colors"
                 >
@@ -304,10 +304,10 @@
 
             @if (showViewerDropdown()) {
             <div class="absolute z-10 w-full mt-1 bg-card border border-border rounded-md shadow-lg max-h-56 overflow-auto">
-              @if (availableUsers().length === 0) {
+              @if (isUsersLoading()) {
               <div class="px-3 py-2 text-sm text-muted-foreground">Loading users...</div>
               } @else {
-                @for (user of availableUsers(); track user.id) {
+                @for (user of getAvailableUsers(); track user.id) {
                 <label
                   class="flex items-center px-3 py-2 hover:bg-muted cursor-pointer transition-colors"
                 >

@@ -98,31 +98,18 @@ export class ProjectModalComponent implements OnChanges {
   }
 
   loadUsers() {
-    console.log('🔍 loadUsers() called');
-    const current = this.authService.currentUserSignal();
-    const projectId = this.isEditing && this.projectToEdit ? this.projectToEdit.id : null;
-    let src$ = this.usersService.getAllUsers();
-    if (projectId) {
-      if (current?.role === 'ADMIN') {
-        src$ = this.usersService.getAllUsers();
-      } else {
-        src$ = this.usersService.getAssignableUsers(projectId);
-      }
-    }
-
-    src$.subscribe({
+    console.log('🔍 loadUsers() - fetching all users (public endpoint)');
+    
+    this.usersService.getAllUsers().subscribe({
       next: (users) => {
-        console.log('✅ Users loaded successfully:', users);
-        this.availableUsers.set(users);
+        console.log('✅ getAllUsers() response:', users);
+        const userList = users || [];
+        console.log('✅ Users loaded successfully:', userList.length, 'users');
+        this.availableUsers.set(userList);
       },
       error: (err) => {
         console.error('❌ Failed to load users:', err);
-        console.error('Error details:', {
-          status: err.status,
-          message: err.message,
-          error: err.error
-        });
-      },
+      }
     });
   }
 
@@ -221,8 +208,12 @@ export class ProjectModalComponent implements OnChanges {
 
   // Resolve a friendly display name for a user id
   getUserName(userId: string): string {
-    const user = this.availableUsers().find((u) => u.id === userId);
-    return user ? `${user.firstName}` : 'User';
+    const users = this.getAvailableUsers(); // Use safe getter
+    if (users.length === 0) return 'User';
+    const user = users.find((u) => u.id === userId);
+    if (!user) return 'User';
+    const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
+    return fullName || user.email || 'User';
   }
 
   getSelectedOwnersCount(): number {
@@ -235,6 +226,23 @@ export class ProjectModalComponent implements OnChanges {
 
   getSelectedViewersCount(): number {
     return this.selectedViewerIds().length;
+  }
+
+  // Safe access to available users
+  getAvailableUsers(): User[] {
+    const users = this.availableUsers();
+    // Ensure we always return an array
+    if (!users) return [];
+    if (!Array.isArray(users)) {
+      console.warn('⚠️ availableUsers is not an array:', users);
+      return [];
+    }
+    return users;
+  }
+
+  isUsersLoading(): boolean {
+    const users = this.availableUsers();
+    return !users || users.length === 0;
   }
 
   getColorName(hexColor: string): string {

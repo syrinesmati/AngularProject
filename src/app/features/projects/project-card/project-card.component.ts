@@ -51,6 +51,53 @@ export class ProjectCardComponent {
     return email?.charAt(0).toUpperCase() || 'U';
   }
 
+  getMemberInitials(member: ProjectMember): string {
+    const u = member.user as any;
+    
+    if (!u) {
+      // Check if user data is directly on the member object
+      const firstName = (member as any).firstName || '';
+      const lastName = (member as any).lastName || '';
+      if (firstName || lastName) {
+        const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+        return initials;
+      }
+      return 'U';
+    }
+    
+    const first = (u.firstName || '').trim();
+    const last = (u.lastName || '').trim();
+    
+    // Build initials from first and last name
+    if (first && last) {
+      return `${first.charAt(0)}${last.charAt(0)}`.toUpperCase();
+    }
+    
+    // If only first name
+    if (first) {
+      return first.charAt(0).toUpperCase();
+    }
+    
+    // If only last name
+    if (last) {
+      return last.charAt(0).toUpperCase();
+    }
+    
+    // Fallback to email
+    if (u.email) {
+      return String(u.email).charAt(0).toUpperCase();
+    }
+    
+    return 'U';
+  }
+
+  getMemberTitle(member: ProjectMember): string {
+    const u = member.user as any;
+    if (!u) return 'Member';
+    const name = [u.firstName, u.lastName].filter(Boolean).join(' ').trim();
+    return name || u.email || 'Member';
+  }
+
   getProgressPercentage(): number {
     const total = this.getTaskCount();
     if (total === 0) return 0;

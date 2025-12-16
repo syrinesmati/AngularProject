@@ -89,9 +89,9 @@
       @for (member of getDisplayMembers(); track member.id) {
       <div
         class="h-7 w-7 rounded-full border-2 border-card bg-secondary flex items-center justify-center text-[10px] font-medium"
-        [title]="member.user?.email || ''"
+        [title]="getMemberTitle(member)"
       >
-        {{ getInitials(member.user?.email || 'U') }}
+        {{ getMemberInitials(member) }}
       </div>
       } @if (getRemainingMemberCount() > 0) {
       <div
