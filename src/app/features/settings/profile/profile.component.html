@@ -1,0 +1,149 @@
+<div class="rounded-xl border border-border bg-card shadow-medium">
+  <div class="p-6 border-b border-border">
+    <h2 class="text-xl font-semibold text-foreground">Profile Information</h2>
+    <p class="text-sm text-muted-foreground mt-1">
+      Update your personal information and profile picture
+    </p>
+  </div>
+
+  <div class="p-6">
+    <!-- Success Message -->
+    @if (successMessage()) {
+      <div class="rounded-lg bg-green-50 border border-green-200 p-4 mb-4">
+        <div class="flex">
+          <div class="flex-shrink-0">
+            <svg class="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+            </svg>
+          </div>
+          <div class="ml-3">
+            <p class="text-sm font-medium text-green-800">{{ successMessage() }}</p>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- Error Message -->
+    @if (errorMessage()) {
+      <div class="rounded-lg bg-red-50 border border-red-200 p-4 mb-4">
+        <div class="flex">
+          <div class="flex-shrink-0">
+            <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+            </svg>
+          </div>
+          <div class="ml-3">
+            <p class="text-sm font-medium text-red-800">{{ errorMessage() }}</p>
+          </div>
+        </div>
+      </div>
+    }
+
+    <form [formGroup]="profileForm" (ngSubmit)="onSubmit()" class="space-y-6">
+      <!-- Avatar Section -->
+      <div class="flex items-center gap-6">
+        <div class="relative">
+          <div class="h-20 w-20 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xl font-semibold">
+            @if (previewAvatar()) {
+              <img [src]="previewAvatar()" [alt]="currentUser()?.firstName" class="h-20 w-20 rounded-full object-cover" />
+            } @else if (currentUser()?.avatar) {
+              <img [src]="currentUser()?.avatar" [alt]="currentUser()?.firstName" class="h-20 w-20 rounded-full object-cover" />
+            } @else {
+              {{ initials }}
+            }
+          </div>
+        </div>
+        <div class="space-y-2">
+          <label for="avatar-upload" class="inline-flex items-center justify-center rounded-lg bg-secondary text-secondary-foreground hover:bg-secondary/80 h-10 px-4 py-2 text-sm font-medium transition-colors cursor-pointer">
+            Change Photo
+            <input
+              id="avatar-upload"
+              type="file"
+              accept="image/*"
+              (change)="onFileSelected($event)"
+              class="hidden"
+            />
+          </label>
+          <p class="text-xs text-muted-foreground">
+            JPG, GIF or PNG. Max size 2MB.
+          </p>
+        </div>
+      </div>
+
+      <!-- Form Fields -->
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div class="space-y-2">
+          <label for="firstName" class="text-sm font-medium text-foreground">First Name</label>
+          <input
+            id="firstName"
+            type="text"
+            formControlName="firstName"
+            placeholder="John"
+            class="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+          @if (profileForm.get('firstName')?.invalid && profileForm.get('firstName')?.touched) {
+            <p class="text-xs text-destructive">
+              @if (profileForm.get('firstName')?.errors?.['required']) {
+                <span>First name is required</span>
+              }
+            </p>
+          }
+        </div>
+
+        <div class="space-y-2">
+          <label for="lastName" class="text-sm font-medium text-foreground">Last Name</label>
+          <input
+            id="lastName"
+            type="text"
+            formControlName="lastName"
+            placeholder="Doe"
+            class="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+          @if (profileForm.get('lastName')?.invalid && profileForm.get('lastName')?.touched) {
+            <p class="text-xs text-destructive">
+              @if (profileForm.get('lastName')?.errors?.['required']) {
+                <span>Last name is required</span>
+              }
+            </p>
+          }
+        </div>
+      </div>
+
+      <div class="space-y-2">
+        <label for="email" class="text-sm font-medium text-foreground">Email</label>
+        <input
+          id="email"
+          type="email"
+          formControlName="email"
+          placeholder="john.doe@example.com"
+          readonly
+          class="flex h-10 w-full rounded-lg border border-input bg-muted px-3 py-2 text-sm text-muted-foreground cursor-not-allowed"
+        />
+        <p class="text-xs text-muted-foreground">
+          Email address cannot be changed
+        </p>
+      </div>
+
+      <!-- Submit Button -->
+      <div class="flex justify-end">
+        <button
+          type="submit"
+          [disabled]="profileForm.invalid || isSubmitting()"
+          class="inline-flex items-center justify-center rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 text-sm font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          @if (isSubmitting()) {
+            <div class="flex items-center gap-2">
+              <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span>Saving...</span>
+            </div>
+          } @else {
+            <span>Save Changes</span>
+          }
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

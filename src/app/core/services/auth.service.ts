@@ -33,9 +33,16 @@ export class AuthService extends BaseService {
     const userJson = localStorage.getItem('currentUser');
     console.log('Loading user from storage:', { userJson: !!userJson });
     if (userJson) {
-      const user = JSON.parse(userJson);
-      console.log('Setting current user from storage:', user);
-      this.updateCurrentUser(user);
+      try {
+        const user = JSON.parse(userJson);
+        console.log('Setting current user from storage:', user);
+        this.updateCurrentUser(user);
+      } catch (error) {
+        console.error('Error parsing user data from localStorage:', error);
+        // Clear corrupted data
+        localStorage.removeItem('currentUser');
+        console.log('Cleared corrupted user data from localStorage');
+      }
     } else {
       console.log('No user data in storage');
     }

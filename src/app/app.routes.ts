@@ -115,50 +115,9 @@ export const routes: Routes = [
 
 
       {
-        path: 'profile/edit',
+        path: 'profile',
         loadComponent: () => import('./features/profile/profile-form/profile-form.component').then(m => m.ProfileFormComponent),
         data: { title: 'Edit Profile' },
-      },
-      {
-        path: 'settings/edit',
-        loadComponent: () => import('./features/settings/settings-form/settings-form.component').then(m => m.SettingsFormComponent),
-        data: { title: 'Settings' },
-      },
-
-
-      {
-        path: 'profile',
-        redirectTo: 'profile/edit',
-        pathMatch: 'full',
-      },
-      {
-        path: 'settings',
-        redirectTo: 'settings/edit',
-        pathMatch: 'full',
-      },
-
-
-      {
-        path: 'profile/edit',
-        loadComponent: () => import('./features/profile/profile-form/profile-form.component').then(m => m.ProfileFormComponent),
-        data: { title: 'Edit Profile' },
-      },
-      {
-        path: 'settings/edit',
-        loadComponent: () => import('./features/settings/settings-form/settings-form.component').then(m => m.SettingsFormComponent),
-        data: { title: 'Settings' },
-      },
-
-
-      {
-        path: 'profile',
-        redirectTo: 'profile/edit',
-        pathMatch: 'full',
-      },
-      {
-        path: 'settings',
-        redirectTo: 'settings/edit',
-        pathMatch: 'full',
       },
 
       // ============================================
@@ -172,26 +131,15 @@ export const routes: Routes = [
       },
 
       // ============================================
-      // SETTINGS, NOTIFICATIONS, SEARCH
+      // SETTINGS
       // ============================================
-      // {
-      //   path: 'settings',
-      //   loadComponent: () =>
-      //     import('./features/settings/settings.component').then((m) => m.SettingsComponent),
-      //   data: { title: 'Settings' },
-      // },
-      // {
-      //   path: 'notifications',
-      //   loadComponent: () =>
-      //     import('./features/dashboard/dashboard.component').then((m) => m.DashboardComponent),
-      //   data: { title: 'Notifications' },
-      // },
-      // {
-      //   path: 'search',
-      //   loadComponent: () =>
-      //     import('./features/dashboard/dashboard.component').then((m) => m.DashboardComponent),
-      //   data: { title: 'Search' },
-      // },
+      {
+        path: 'settings',
+        loadComponent: () =>
+          import('./features/settings/settings.component').then((m) => m.SettingsComponent),
+        data: { title: 'Settings' },
+        canActivate: [authGuard],
+      },
 
       // ============================================
       // ADMIN ROUTES

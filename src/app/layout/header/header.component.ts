@@ -62,12 +62,12 @@ export class HeaderComponent {
   }
 
   navigateToProfile() {
-    this.router.navigate(['/profile/edit']);
+    this.router.navigate(['/settings'], { queryParams: { tab: 'profile' } });
     this.showUserDropdown = false;
   }
 
   navigateToSettings() {
-    this.router.navigate(['/settings/edit']);
+    this.router.navigate(['/settings']);
     this.showUserDropdown = false;
   }
 

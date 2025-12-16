@@ -1,0 +1,86 @@
+<div class="rounded-xl border border-border bg-card shadow-medium">
+  <div class="p-6 border-b border-border">
+    <h2 class="text-xl font-semibold text-foreground">Notification Preferences</h2>
+    <p class="text-sm text-muted-foreground mt-1">
+      Choose how you want to be notified about updates
+    </p>
+  </div>
+
+  <div class="p-6 space-y-6">
+    <div class="flex items-center justify-between">
+      <div class="space-y-0.5">
+        <label class="text-sm font-medium text-foreground">Email Notifications</label>
+        <p class="text-sm text-muted-foreground">
+          Receive email updates about your tasks and projects
+        </p>
+      </div>
+      <button
+        (click)="toggleEmail()"
+        [class]="emailNotifications() ? 'bg-primary' : 'bg-secondary'"
+        class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+      >
+        <span
+          [class]="emailNotifications() ? 'translate-x-6' : 'translate-x-1'"
+          class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+        ></span>
+      </button>
+    </div>
+
+    <div class="flex items-center justify-between">
+      <div class="space-y-0.5">
+        <label class="text-sm font-medium text-foreground">Push Notifications</label>
+        <p class="text-sm text-muted-foreground">
+          Get push notifications in your browser
+        </p>
+      </div>
+      <button
+        (click)="togglePush()"
+        [class]="pushNotifications() ? 'bg-primary' : 'bg-secondary'"
+        class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+      >
+        <span
+          [class]="pushNotifications() ? 'translate-x-6' : 'translate-x-1'"
+          class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+        ></span>
+      </button>
+    </div>
+
+    <div class="flex items-center justify-between">
+      <div class="space-y-0.5">
+        <label class="text-sm font-medium text-foreground">Task Reminders</label>
+        <p class="text-sm text-muted-foreground">
+          Remind me of upcoming task deadlines
+        </p>
+      </div>
+      <button
+        (click)="toggleReminders()"
+        [class]="taskReminders() ? 'bg-primary' : 'bg-secondary'"
+        class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+      >
+        <span
+          [class]="taskReminders() ? 'translate-x-6' : 'translate-x-1'"
+          class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+        ></span>
+      </button>
+    </div>
+
+    <div class="flex items-center justify-between">
+      <div class="space-y-0.5">
+        <label class="text-sm font-medium text-foreground">Weekly Digest</label>
+        <p class="text-sm text-muted-foreground">
+          Receive a weekly summary of your activity
+        </p>
+      </div>
+      <button
+        (click)="toggleDigest()"
+        [class]="weeklyDigest() ? 'bg-primary' : 'bg-secondary'"
+        class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+      >
+        <span
+          [class]="weeklyDigest() ? 'translate-x-6' : 'translate-x-1'"
+          class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+        ></span>
+      </button>
+    </div>
+  </div>
+</div>

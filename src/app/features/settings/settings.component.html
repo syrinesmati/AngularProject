@@ -1,0 +1,71 @@
+<div class="max-w-4xl mx-auto space-y-6 animate-fade-in">
+  <div>
+    <h1 class="text-2xl font-bold text-foreground">Settings</h1>
+    <p class="text-muted-foreground">Manage your account and preferences</p>
+  </div>
+
+  <!-- Tabs Navigation -->
+  <div class="border-b border-border">
+    <nav class="flex space-x-8" aria-label="Tabs">
+      <button
+        (click)="setActiveTab('profile')"
+        [class]="activeTab === 'profile'
+          ? 'border-primary text-primary whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm'
+          : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm'"
+        class="flex items-center gap-2"
+      >
+        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+        </svg>
+        <span class="hidden sm:inline">Profile</span>
+      </button>
+
+      <button
+        (click)="setActiveTab('notifications')"
+        [class]="activeTab === 'notifications'
+          ? 'border-primary text-primary whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm'
+          : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm'"
+        class="flex items-center gap-2"
+      >
+        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-5 5v-5zM4.868 12.683A17.925 17.925 0 012 21h13.78a2 2 0 001.994-1.84L21 12.683V7a4 4 0 00-4-4H7a4 4 0 00-4 4v5.683z" />
+        </svg>
+        <span class="hidden sm:inline">Notifications</span>
+      </button>
+
+      <button
+        (click)="setActiveTab('appearance')"
+        [class]="activeTab === 'appearance'
+          ? 'border-primary text-primary whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm'
+          : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm'"
+        class="flex items-center gap-2"
+      >
+        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zM21 5a2 2 0 00-2-2h-4a2 2 0 00-2 2v12a4 4 0 004 4h4a2 2 0 002-2V5z" />
+        </svg>
+        <span class="hidden sm:inline">Appearance</span>
+      </button>
+
+      <button
+        (click)="setActiveTab('security')"
+        [class]="activeTab === 'security'
+          ? 'border-primary text-primary whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm'
+          : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm'"
+        class="flex items-center gap-2"
+      >
+        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+        </svg>
+        <span class="hidden sm:inline">Security</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- Tab Content -->
+  <div class="mt-6">
+    <app-profile *ngIf="activeTab === 'profile'"></app-profile>
+    <app-notifications *ngIf="activeTab === 'notifications'"></app-notifications>
+    <app-preferences *ngIf="activeTab === 'appearance'"></app-preferences>
+    <app-security *ngIf="activeTab === 'security'"></app-security>
+  </div>
+</div>
