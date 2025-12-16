@@ -1,0 +1,228 @@
+<div class="space-y-6">
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold text-foreground">Notifications</h1>
+      <p class="text-muted-foreground">
+        Stay updated with your latest activities
+        @if (totalCount() > 0) {
+        <span class="text-sm">({{ totalCount() }} total)</span>
+        }
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button
+        (click)="toggleFilters()"
+        class="flex items-center gap-2 px-3 py-2 text-sm rounded-md border border-border hover:bg-accent transition-colors"
+      >
+        <lucide-icon name="Filter" [size]="16"></lucide-icon>
+        Filters
+        @if (showFilters()) {
+        <lucide-icon name="ChevronUp" [size]="14"></lucide-icon>
+        } @else {
+        <lucide-icon name="ChevronDown" [size]="14"></lucide-icon>
+        }
+      </button>
+      @if (hasUnreadNotifications()) {
+      <button
+        (click)="markAllAsRead()"
+        class="flex items-center gap-2 px-3 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+      >
+        <lucide-icon name="CheckCheck" [size]="16"></lucide-icon>
+        Mark all read
+      </button>
+      }
+    </div>
+  </div>
+
+  <!-- Filters Panel -->
+  @if (showFilters()) {
+  <div class="rounded-lg border border-border bg-card p-4">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <!-- Date Filter -->
+      <div>
+        <label class="block text-sm font-medium text-foreground mb-2">Date</label>
+        <select
+          [value]="dateFilter()"
+          (change)="setDateFilter($any($event.target).value)"
+          class="w-full px-3 py-2 text-sm rounded-md border border-border bg-background"
+        >
+          <option value="all">All time</option>
+          <option value="today">Today</option>
+          <option value="yesterday">Yesterday</option>
+          <option value="week">Last 7 days</option>
+          <option value="month">Last 30 days</option>
+        </select>
+      </div>
+
+      <!-- Read Status Filter -->
+      <div>
+        <label class="block text-sm font-medium text-foreground mb-2">Status</label>
+        <select
+          [value]="readFilter()"
+          (change)="setReadFilter($any($event.target).value)"
+          class="w-full px-3 py-2 text-sm rounded-md border border-border bg-background"
+        >
+          <option value="all">All notifications</option>
+          <option value="unread">Unread only</option>
+          <option value="read">Read only</option>
+        </select>
+      </div>
+
+      <!-- Type Filter -->
+      <div>
+        <label class="block text-sm font-medium text-foreground mb-2">Type</label>
+        <select
+          [value]="notificationsService.typeFilterSignal() || 'all'"
+          (change)="setTypeFilter($any($event.target).value === 'all' ? null : $any($event.target).value)"
+          class="w-full px-3 py-2 text-sm rounded-md border border-border bg-background"
+        >
+          <option value="all">All types</option>
+          <option value="TASK_ASSIGNED">Task assigned</option>
+          <option value="TASK_UPDATED">Task updated</option>
+          <option value="TASK_COMPLETED">Task completed</option>
+          <option value="COMMENT_ADDED">Comment added</option>
+          <option value="PROJECT_INVITE">Project invite</option>
+          <option value="MENTION">Mention</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="flex justify-end mt-4">
+      <button
+        (click)="clearFilters()"
+        class="px-3 py-2 text-sm text-primary hover:underline"
+      >
+        Clear filters
+      </button>
+    </div>
+  </div>
+  }
+
+  <!-- Loading State -->
+  @if (loading()) {
+  <div class="flex items-center justify-center py-12">
+    <div class="flex items-center gap-3">
+      <lucide-icon name="RefreshCw" [size]="24" class="animate-spin text-muted-foreground"></lucide-icon>
+      <p class="text-muted-foreground">Loading notifications...</p>
+    </div>
+  </div>
+  }
+
+  <!-- Error State -->
+  @else if (error()) {
+  <div class="flex flex-col items-center justify-center py-12">
+    <lucide-icon name="AlertCircle" [size]="48" class="text-destructive mb-4"></lucide-icon>
+    <h3 class="text-lg font-semibold text-foreground mb-2">Failed to load notifications</h3>
+    <p class="text-muted-foreground text-center mb-4">{{ error() }}</p>
+    <button
+      (click)="notificationsService.loadNotifications().subscribe()"
+      class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+    >
+      Try again
+    </button>
+  </div>
+  }
+
+  <!-- Notifications List -->
+  @else {
+  @if (filteredNotifications().length > 0) {
+  <div class="space-y-4">
+    @for (notification of filteredNotifications(); track notification.id) {
+    <div class="group relative rounded-lg border border-border bg-card hover:bg-accent/50 transition-colors">
+      <div class="flex gap-4 p-4">
+        <!-- Icon -->
+        <div
+          class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+          [ngClass]="getNotificationColor(notification.type)"
+        >
+          <lucide-icon [name]="getNotificationIcon(notification.type)" [size]="20"></lucide-icon>
+        </div>
+
+        <!-- Content -->
+        <div class="flex-1 space-y-2 min-w-0">
+          <div class="flex items-start justify-between gap-4">
+            <div class="flex-1">
+              <h3 class="font-semibold text-foreground leading-tight">
+                {{ notification.title }}
+              </h3>
+              <p class="text-sm text-muted-foreground mt-1 leading-relaxed">
+                {{ notification.message }}
+              </p>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex items-center gap-2 shrink-0">
+              @if (!notification.isRead) {
+              <div class="h-2 w-2 rounded-full bg-primary"></div>
+              }
+              <button
+                (click)="deleteNotification(notification.id)"
+                class="opacity-0 group-hover:opacity-100 p-1 rounded-md hover:bg-destructive hover:text-destructive-foreground transition-all"
+                title="Delete notification"
+              >
+                <lucide-icon name="X" [size]="16"></lucide-icon>
+              </button>
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-4 text-xs text-muted-foreground">
+              <span>{{ getTimeAgo(notification.createdAt) }}</span>
+              <span>{{ getFormattedDate(notification.createdAt) }}</span>
+            </div>
+
+            @if (!notification.isRead) {
+            <button
+              (click)="markAsRead(notification.id)"
+              class="text-xs text-primary hover:underline"
+            >
+              Mark as read
+            </button>
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+    }
+
+    <!-- Load More (if needed in future) -->
+    @if (filteredCount() < totalCount()) {
+    <div class="text-center py-4">
+      <p class="text-sm text-muted-foreground">
+        Showing {{ filteredCount() }} of {{ totalCount() }} notifications
+      </p>
+    </div>
+    }
+  </div>
+  }
+
+  <!-- Empty State -->
+  @else {
+  <div class="flex flex-col items-center justify-center py-16">
+    <lucide-icon
+      name="bell-off"
+      [size]="64"
+      class="text-muted-foreground/50 mb-4"
+    ></lucide-icon>
+    <h3 class="text-xl font-semibold text-foreground mb-2">No notifications found</h3>
+    <p class="text-muted-foreground text-center max-w-md">
+      @if (dateFilter() !== 'all' || readFilter() !== 'all' || notificationsService.typeFilterSignal()) {
+      Try adjusting your filters to see more notifications.
+      } @else {
+      You're all caught up! New notifications will appear here.
+      }
+    </p>
+    @if (dateFilter() !== 'all' || readFilter() !== 'all' || notificationsService.typeFilterSignal()) {
+    <button
+      (click)="clearFilters()"
+      class="mt-4 px-4 py-2 text-primary hover:underline"
+    >
+      Clear filters
+    </button>
+    }
+  </div>
+  }
+  }
+</div>

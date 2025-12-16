@@ -131,6 +131,17 @@ export const routes: Routes = [
       },
 
       // ============================================
+      // NOTIFICATIONS
+      // ============================================
+      {
+        path: 'notifications',
+        loadComponent: () =>
+          import('./features/notifications/notifications/notifications.component').then((m) => m.NotificationsComponent),
+        data: { title: 'Notifications' },
+        canActivate: [authGuard],
+      },
+
+      // ============================================
       // SETTINGS
       // ============================================
       {

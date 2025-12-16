@@ -1,9 +1,10 @@
-import { Component, signal, Output, EventEmitter, inject } from '@angular/core';
+import { Component, signal, Output, EventEmitter, inject, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 import { UserRole } from '../../core/models/user.model';
 import { LucideIconComponent } from '../../shared/components/lucide-icon/lucide-icon.component';
+import { NotificationsService } from '../../core/services/notifications.service';
 
 interface NavItem {
   path: string;
@@ -21,6 +22,7 @@ interface NavItem {
 })
 export class SidebarComponent {
   private authService = inject(AuthService);
+  private notificationsService = inject(NotificationsService);
 
   collapsed = signal(false);
   @Output() collapsedChange = new EventEmitter<boolean>();
@@ -35,11 +37,18 @@ export class SidebarComponent {
     { path: '/board', label: 'Board', icon: 'Kanban' },
   ];
 
-  bottomNavItems: NavItem[] = [
-    { path: '/search', label: 'Search', icon: 'Search' },
-    { path: '/notifications', label: 'Notifications', icon: 'Bell', badge: 2 },
-    { path: '/settings', label: 'Settings', icon: 'Settings' },
-  ];
+  get bottomNavItems() {
+    return [
+      { path: '/search', label: 'Search', icon: 'Search' },
+      {
+        path: '/notifications',
+        label: 'Notifications',
+        icon: 'Bell',
+        badge: this.notificationsService.unreadCountSignal()
+      },
+      { path: '/settings', label: 'Settings', icon: 'Settings' },
+    ];
+  }
 
   toggleCollapse() {
     this.collapsed.update((v) => !v);
