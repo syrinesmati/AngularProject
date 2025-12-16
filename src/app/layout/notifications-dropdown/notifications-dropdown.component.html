@@ -127,7 +127,7 @@
     </div>
     } @else if (error()) {
     <div class="p-8 text-center">
-      <lucide-icon name="AlertTriangle" [size]="24" class="mx-auto text-destructive"></lucide-icon>
+      <lucide-icon name="AlertCircle" [size]="24" class="mx-auto text-destructive"></lucide-icon>
       <p class="mt-2 text-sm text-destructive">{{ error() }}</p>
       <button
         (click)="notificationsService.loadNotifications().subscribe()"

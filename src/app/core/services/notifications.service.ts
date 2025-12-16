@@ -130,42 +130,42 @@ export class NotificationsService extends BaseService {
    */
   getNotifications(unreadOnly?: boolean): Observable<Notification[]> {
     if (unreadOnly) {
-      return this.http.get<Notification[]>(this.buildUrl('/notifications'), {
+      return this.http.get<ApiResponse<Notification[]>>(this.buildUrl('/notifications'), {
         params: { unreadOnly: 'true' },
-      });
+      }).pipe(map(response => response.data));
     }
-    return this.http.get<Notification[]>(this.buildUrl('/notifications'));
+    return this.http.get<ApiResponse<Notification[]>>(this.buildUrl('/notifications')).pipe(map(response => response.data));
   }
 
   /**
    * Get count of unread notifications
    */
   getUnreadCount(): Observable<UnreadCountResponse> {
-    return this.http.get<UnreadCountResponse>(this.buildUrl('/notifications/unread-count'));
+    return this.http.get<ApiResponse<UnreadCountResponse>>(this.buildUrl('/notifications/unread-count')).pipe(map(response => response.data));
   }
 
   /**
    * Mark a notification as read
    */
   markAsRead(notificationId: string): Observable<Notification> {
-    return this.http.patch<Notification>(
+    return this.http.patch<ApiResponse<Notification>>(
       this.buildUrl(`/notifications/${notificationId}/read`),
       {}
-    );
+    ).pipe(map(response => response.data));
   }
 
   /**
    * Mark all notifications as read
    */
   markAllAsRead(): Observable<void> {
-    return this.http.patch<void>(this.buildUrl('/notifications/read-all'), {});
+    return this.http.patch<ApiResponse<{ updated: boolean }>>(this.buildUrl('/notifications/read-all'), {}).pipe(map(() => void 0));
   }
 
   /**
    * Delete a notification
    */
   deleteNotification(notificationId: string): Observable<void> {
-    return this.http.delete<void>(this.buildUrl(`/notifications/${notificationId}`));
+    return this.http.delete<ApiResponse<{ deleted: boolean }>>(this.buildUrl(`/notifications/${notificationId}`)).pipe(map(() => void 0));
   }
 
   // ============================================
