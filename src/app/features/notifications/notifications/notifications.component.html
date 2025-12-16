@@ -107,7 +107,7 @@
   <!-- Error State -->
   @else if (error()) {
   <div class="flex flex-col items-center justify-center py-12">
-    <lucide-icon name="AlertTriangle" [size]="48" class="text-destructive mb-4"></lucide-icon>
+    <lucide-icon name="AlertCircle" [size]="48" class="text-destructive mb-4"></lucide-icon>
     <h3 class="text-lg font-semibold text-foreground mb-2">Failed to load notifications</h3>
     <p class="text-muted-foreground text-center mb-4">{{ error() }}</p>
     <button
@@ -124,7 +124,7 @@
   @if (filteredNotifications().length > 0) {
   <div class="space-y-4">
     @for (notification of filteredNotifications(); track notification.id) {
-    <div class="group relative rounded-lg border border-border bg-card hover:bg-accent/50 transition-colors">
+    <div class="group relative rounded-lg border border-border transition-colors cursor-pointer" [ngClass]="!notification.isRead ? 'bg-accent/50 hover:bg-accent' : 'hover:bg-accent/50'" (click)="notification.isRead || markAsRead(notification.id)">
       <div class="flex gap-4 p-4">
         <!-- Icon -->
         <div
@@ -152,7 +152,7 @@
               <div class="h-2 w-2 rounded-full bg-primary"></div>
               }
               <button
-                (click)="deleteNotification(notification.id)"
+                (click)="$event.stopPropagation(); deleteNotification(notification.id)"
                 class="opacity-0 group-hover:opacity-100 p-1 rounded-md hover:bg-destructive hover:text-destructive-foreground transition-all"
                 title="Delete notification"
               >
@@ -167,15 +167,6 @@
               <span>{{ getTimeAgo(notification.createdAt) }}</span>
               <span>{{ getFormattedDate(notification.createdAt) }}</span>
             </div>
-
-            @if (!notification.isRead) {
-            <button
-              (click)="markAsRead(notification.id)"
-              class="text-xs text-primary hover:underline"
-            >
-              Mark as read
-            </button>
-            }
           </div>
         </div>
       </div>
