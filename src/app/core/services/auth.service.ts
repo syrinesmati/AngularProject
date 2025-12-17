@@ -4,12 +4,14 @@ import { Router } from '@angular/router';
 import { BehaviorSubject, Observable, tap } from 'rxjs';
 import { User, UserRole, AuthResponse, LoginDto, RegisterDto } from '../models/user.model';
 import { BaseService } from './base.service';
+import { WebSocketService } from './websocket.service';
 
 @Injectable({
   providedIn: 'root',
 })
 export class AuthService extends BaseService {
   private router = inject(Router);
+  private webSocketService = inject(WebSocketService);
 
   private currentUserSubject = new BehaviorSubject<User | null>(null);
   public currentUser$ = this.currentUserSubject.asObservable();
@@ -37,6 +39,8 @@ export class AuthService extends BaseService {
         const user = JSON.parse(userJson);
         console.log('Setting current user from storage:', user);
         this.updateCurrentUser(user);
+        // Reconnect WebSocket if user is loaded from storage
+        this.webSocketService.reconnect();
       } catch (error) {
         console.error('Error parsing user data from localStorage:', error);
         // Clear corrupted data
@@ -104,9 +108,15 @@ export class AuthService extends BaseService {
    * Handle successful authentication
    */
   private handleAuthSuccess(response: AuthResponse): void {
-    // Token is stored in httpOnly cookie by backend
-    // Just store user data
+    // Store token in localStorage for WebSocket authentication
+    if (response.access_token) {
+      this.setToken(response.access_token);
+    }
+    // Store user data
     this.updateCurrentUser(response.user);
+
+    // Reconnect WebSocket with new authentication
+    this.webSocketService.reconnect();
   }
 
   /**

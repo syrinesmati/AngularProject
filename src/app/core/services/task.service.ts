@@ -177,7 +177,7 @@ export class TasksService extends BaseService {
    * Create a new task
    */
   createTask(dto: CreateTaskDto): Observable<Task> {
-    return this.http.post<Task>(this.buildUrl('/tasks'), dto);
+    return this.http.post<ApiResponse<Task>>(this.buildUrl('/tasks'), dto).pipe(map(response => response.data));
   }
 
   /**
@@ -238,7 +238,7 @@ export class TasksService extends BaseService {
     }
 
     return this.http
-      .get<TaskListResponse>(this.buildUrl('/tasks/my-tasks'), {
+      .get<ApiResponse<Task[]>>(this.buildUrl('/tasks/my-tasks'), {
         params,
         withCredentials: true,
       })
@@ -249,21 +249,21 @@ export class TasksService extends BaseService {
    * Get a single task by ID
    */
   getTaskById(id: string): Observable<Task> {
-    return this.http.get<Task>(this.buildUrl(`/tasks/${id}`));
+    return this.http.get<ApiResponse<Task>>(this.buildUrl(`/tasks/${id}`)).pipe(map(response => response.data));
   }
 
   /**
    * Update a task
    */
   updateTask(id: string, dto: UpdateTaskDto): Observable<Task> {
-    return this.http.patch<Task>(this.buildUrl(`/tasks/${id}`), dto);
+    return this.http.patch<ApiResponse<Task>>(this.buildUrl(`/tasks/${id}`), dto).pipe(map(response => response.data));
   }
 
   /**
    * Delete a task
    */
   deleteTask(id: string): Observable<{ message: string }> {
-    return this.http.delete<{ message: string }>(this.buildUrl(`/tasks/${id}`));
+    return this.http.delete<ApiResponse<{ message: string }>>(this.buildUrl(`/tasks/${id}`)).pipe(map(response => response.data));
   }
 
   /**
@@ -277,16 +277,16 @@ export class TasksService extends BaseService {
    * Assign a user to a task
    */
   assignUser(taskId: string, userId: string): Observable<Task> {
-    return this.http.post<Task>(this.buildUrl(`/tasks/${taskId}/assign`), { userId });
+    return this.http.post<ApiResponse<Task>>(this.buildUrl(`/tasks/${taskId}/assign`), { userId }).pipe(map(response => response.data));
   }
 
   /**
    * Unassign a user from a task
    */
   unassignUser(taskId: string, userId: string): Observable<{ message: string }> {
-    return this.http.delete<{ message: string }>(
+    return this.http.delete<ApiResponse<{ message: string }>>(
       this.buildUrl(`/tasks/${taskId}/assign/${userId}`)
-    );
+    ).pipe(map(response => response.data));
   }
 
   // ============================================

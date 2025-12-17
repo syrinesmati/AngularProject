@@ -1,4 +1,4 @@
-import { Component, signal, inject, computed, OnInit } from '@angular/core';
+import { Component, signal, inject, computed, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { formatDistanceToNow, isToday, isYesterday, format } from 'date-fns';
 import { LucideIconComponent } from '../../../shared/components/lucide-icon/lucide-icon.component';
@@ -84,10 +84,18 @@ export class NotificationsComponent implements OnInit {
   totalCount = computed(() => this.notifications().length);
   filteredCount = computed(() => this.filteredNotifications().length);
 
-  constructor() {}
+  constructor(private cdr: ChangeDetectorRef) {}
 
   ngOnInit() {
-    // Data is already loaded by resolver
+    // Load latest notifications when the page is opened
+    this.notificationsService.loadNotifications().subscribe({
+      next: () => {
+        // Notifications loaded
+      },
+      error: (error) => {
+        console.error('Failed to load notifications on page open:', error);
+      }
+    });
   }
 
   toggleFilters() {
@@ -117,6 +125,7 @@ export class NotificationsComponent implements OnInit {
     this.notificationsService.markAsReadWithSignal(notificationId).subscribe({
       next: () => {
         // Notification marked as read
+        this.cdr.detectChanges();
       },
       error: (error) => {
         console.error('Failed to mark notification as read:', error);
@@ -128,6 +137,7 @@ export class NotificationsComponent implements OnInit {
     this.notificationsService.markAllAsReadWithSignal().subscribe({
       next: () => {
         // All notifications marked as read
+        this.cdr.detectChanges();
       },
       error: (error) => {
         console.error('Failed to mark all notifications as read:', error);
@@ -139,6 +149,7 @@ export class NotificationsComponent implements OnInit {
     this.notificationsService.deleteNotificationWithSignal(notificationId).subscribe({
       next: () => {
         // Notification deleted
+        this.cdr.detectChanges();
       },
       error: (error) => {
         console.error('Failed to delete notification:', error);

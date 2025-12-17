@@ -4,6 +4,8 @@ import { tap, catchError, map } from 'rxjs/operators';
 import { Notification, NotificationType } from '../models/notification.model';
 import { BaseService } from './base.service';
 import { LoggerService } from './logger.service';
+import { WebSocketService } from './websocket.service';
+import { AuthService } from './auth.service';
 
 export interface ApiResponse<T> {
   statusCode: number;
@@ -25,6 +27,8 @@ export interface UnreadCountResponse {
 })
 export class NotificationsService extends BaseService {
   private logger = inject(LoggerService);
+  private webSocketService = inject(WebSocketService);
+  private authService = inject(AuthService);
 
   // Signals for state management
   notificationsSignal = signal<Notification[]>([]);
@@ -102,9 +106,22 @@ export class NotificationsService extends BaseService {
       }
     });
 
-    // Auto-refresh unread count every 30 seconds
-    // Temporarily disabled for debugging
-    /*
+    // Set up WebSocket listeners
+    this.setupWebSocketListeners();
+
+    // Reconnect WebSocket when user logs in
+    effect(() => {
+      const user = this.authService.currentUserSignal();
+      if (user) {
+        this.logger.info('User logged in, reconnecting WebSocket');
+        this.webSocketService.reconnect();
+      } else {
+        this.logger.info('User logged out, disconnecting WebSocket');
+        this.webSocketService.disconnect();
+      }
+    });
+
+    // Auto-refresh unread count every 30 seconds (fallback for WebSocket)
     effect(() => {
       const polling$ = interval(30000).pipe(
         startWith(0),
@@ -113,7 +130,10 @@ export class NotificationsService extends BaseService {
 
       const subscription = polling$.subscribe({
         next: (response) => {
-          this.unreadCountSignal.set(response.count);
+          // Only update if WebSocket is not connected
+          if (!this.webSocketService.isConnected()) {
+            this.unreadCountSignal.set(response.count);
+          }
         },
         error: (error) => {
           this.logger.error('Failed to poll unread count:', error);
@@ -122,7 +142,60 @@ export class NotificationsService extends BaseService {
 
       return () => subscription.unsubscribe();
     });
-    */
+  }
+
+  private setupWebSocketListeners() {
+    // Listen for new notifications
+    this.webSocketService.onNewNotification().subscribe({
+      next: (notification) => {
+        this.logger.info('Adding new notification from WebSocket:', notification);
+        // Parse dates from WebSocket (they come as strings)
+        const parsedNotification: Notification = {
+          ...notification,
+          type: notification.type as NotificationType,
+          createdAt: new Date(notification.createdAt),
+          updatedAt: new Date(notification.updatedAt),
+        };
+        this.logger.info('Parsed notification:', parsedNotification);
+        const currentNotifications = this.notificationsSignal();
+        this.logger.info('Current notifications count:', currentNotifications.length);
+        this.notificationsSignal.update(notifications => {
+          const newNotifications = [parsedNotification, ...notifications];
+          this.logger.info('New notifications count after update:', newNotifications.length);
+          return newNotifications;
+        });
+        this.logger.info('Notification added to signal successfully');
+      },
+      error: (error) => {
+        this.logger.warn('WebSocket newNotification error (expected if server not running):', error);
+      }
+    });
+
+    // Listen for unread count updates
+    this.webSocketService.onUnreadCountUpdate().subscribe({
+      next: (data) => {
+        this.logger.info('Updating unread count from WebSocket:', data.count);
+        this.unreadCountSignal.set(data.count);
+      },
+      error: (error) => {
+        this.logger.warn('WebSocket unreadCount error (expected if server not running):', error);
+      }
+    });
+
+    // Listen for notification read events
+    this.webSocketService.onNotificationRead().subscribe({
+      next: (data) => {
+        this.logger.info('Marking notification as read from WebSocket:', data.notificationId);
+        this.notificationsSignal.update(notifications =>
+          notifications.map(n =>
+            n.id === data.notificationId ? { ...n, isRead: true } : n
+          )
+        );
+      },
+      error: (error) => {
+        this.logger.warn('WebSocket notificationRead error (expected if server not running):', error);
+      }
+    });
   }
   /**
    * Get all notifications for current user
@@ -179,7 +252,12 @@ export class NotificationsService extends BaseService {
     this.loadingSignal.set(true);
     this.errorSignal.set(null);
     return this.http.get<ApiResponse<Notification[]>>(this.buildUrl('/notifications')).pipe(
-      map(response => response.data),
+      map(response => response.data.map(notification => ({
+        ...notification,
+        type: notification.type as NotificationType,
+        createdAt: new Date(notification.createdAt),
+        updatedAt: new Date(notification.updatedAt),
+      }))),
       tap((notifications) => {
         this.notificationsSignal.set(notifications);
         this.loadingSignal.set(false);
@@ -221,8 +299,14 @@ export class NotificationsService extends BaseService {
       tap((updatedNotification) => {
         console.log('Service: API call successful, updating signals');
         console.log('Service: Updated notification:', updatedNotification);
+        const parsedNotification: Notification = {
+          ...updatedNotification,
+          type: updatedNotification.type as NotificationType,
+          createdAt: new Date(updatedNotification.createdAt),
+          updatedAt: new Date(updatedNotification.updatedAt),
+        };
         this.notificationsSignal.update(notifications =>
-          notifications.map(n => n.id === notificationId ? updatedNotification : n)
+          notifications.map(n => n.id === notificationId ? parsedNotification : n)
         );
         // Update unread count
         const currentCount = this.unreadCountSignal();

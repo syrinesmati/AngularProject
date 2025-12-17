@@ -1,8 +1,15 @@
 import { Injectable, signal, inject } from '@angular/core';
 import { Observable, tap, catchError, throwError } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { Label } from '../models/task.model';
 import { BaseService } from './base.service';
-import { LoggerService } from './logger.service'; // You'll need to inject LoggerService
+import { LoggerService } from './logger.service';
+
+interface ApiResponse<T> {
+  statusCode: number;
+  message: string;
+  data: T;
+}
 
 export interface CreateLabelDto {
   name: string;
@@ -27,7 +34,8 @@ export class LabelsService extends BaseService {
    * Create a new label and update state
    */
   createLabel(dto: CreateLabelDto): Observable<Label> {
-    return this.http.post<Label>(this.buildUrl('/labels'), dto).pipe(
+    return this.http.post<ApiResponse<Label>>(this.buildUrl('/labels'), dto).pipe(
+      map(response => response.data),
       tap((label) => {
         // Add new label to state
         this.labels.update(labels => [...labels, label]);
@@ -55,7 +63,8 @@ export class LabelsService extends BaseService {
     }
 
     this.logger.info('Loading labels from API');
-    return this.http.get<Label[]>(this.buildUrl('/labels')).pipe(
+    return this.http.get<ApiResponse<Label[]>>(this.buildUrl('/labels')).pipe(
+      map(response => response.data),
       tap((labels) => {
         // Update state with loaded labels
         this.labels.set(labels);
@@ -72,10 +81,11 @@ export class LabelsService extends BaseService {
    * Update a label and update state
    */
   updateLabel(labelId: string, dto: UpdateLabelDto): Observable<Label> {
-    return this.http.patch<Label>(this.buildUrl(`/labels/${labelId}`), dto).pipe(
+    return this.http.patch<ApiResponse<Label>>(this.buildUrl(`/labels/${labelId}`), dto).pipe(
+      map(response => response.data),
       tap((updatedLabel) => {
         // Update label in state
-        this.labels.update(labels => 
+        this.labels.update(labels =>
           labels.map(label => label.id === labelId ? updatedLabel : label)
         );
         this.logger.info(`Label updated: ${updatedLabel.name}`);
@@ -91,10 +101,11 @@ export class LabelsService extends BaseService {
    * Delete a label and update state
    */
   deleteLabel(labelId: string): Observable<void> {
-    return this.http.delete<void>(this.buildUrl(`/labels/${labelId}`)).pipe(
+    return this.http.delete<ApiResponse<{ deleted: boolean }>>(this.buildUrl(`/labels/${labelId}`)).pipe(
+      map(() => void 0),
       tap(() => {
         // Remove label from state
-        this.labels.update(labels => 
+        this.labels.update(labels =>
           labels.filter(label => label.id !== labelId)
         );
         this.logger.info(`Label deleted: ${labelId}`);

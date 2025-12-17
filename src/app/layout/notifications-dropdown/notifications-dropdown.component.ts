@@ -53,7 +53,21 @@ export class NotificationsDropdownComponent implements OnInit {
   }
 
   toggleDropdown() {
-    this.showDropdown.update((v) => !v);
+    this.showDropdown.update((v) => {
+      const newValue = !v;
+      // When opening the dropdown, load latest notifications
+      if (newValue) {
+        this.notificationsService.loadNotifications().subscribe({
+          next: () => {
+            // Notifications loaded
+          },
+          error: (error) => {
+            console.error('Failed to load notifications when opening dropdown:', error);
+          }
+        });
+      }
+      return newValue;
+    });
   }
 
 
