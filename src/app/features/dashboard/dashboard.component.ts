@@ -2,7 +2,7 @@
 import { Component, OnInit, signal, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
-import { forkJoin } from 'rxjs';
+import { forkJoin, of } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
 
 import { AuthService } from '../../core/services/auth.service';
@@ -65,12 +65,18 @@ export class DashboardComponent implements OnInit {
 
     // Use forkJoin to load all data in parallel
     forkJoin({
-      projects: this.projectsService.getAllProjects(),
+      
+    projects: this.projectsService.loadProjects().pipe(
+      catchError(error => {
+        console.error('Error loading projects:', error);
+        return of([] as Project[]);
+      })
+    ),
       tasks: this.tasksService.getMyTasks().pipe(
         catchError(error => {
           console.error('Error loading tasks:', error);
           // Return empty tasks array
-          return [[]];
+          return of([] as Task[]);
         })
       )
     }).pipe(
@@ -96,17 +102,17 @@ export class DashboardComponent implements OnInit {
           })
           .slice(0, 3);
 
-        return { stats, recent, highPriority, projects: projects };
+        return { stats, recent, highPriority, projects: Array.isArray(projects) ? projects : [] };
       }),
       catchError(error => {
         console.error('Dashboard load error:', error);
         this.error.set('Failed to load dashboard data');
-        return [{
+        return of({
           stats: { todoCount: 0, inProgressCount: 0, doneCount: 0, overdueCount: 0 },
           recent: [],
           highPriority: [],
           projects: []
-        }];
+        });
       })
     ).subscribe({
       next: (data) => {

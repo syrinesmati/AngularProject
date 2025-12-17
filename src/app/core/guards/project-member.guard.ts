@@ -52,7 +52,9 @@ export function projectMemberGuard(config: ProjectMemberGuardConfig = {}): CanAc
     }
 
     // Check if user is a project member with sufficient role
-    return projectsService.getProjectMembers(projectId).pipe(
+    const members = projectsService.getProjectMembers(projectId)();
+
+    return of(members).pipe(
       map((members) => {
         const member = members.find((m) => m.userId === user?.id);
 

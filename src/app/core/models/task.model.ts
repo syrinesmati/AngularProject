@@ -5,7 +5,6 @@ export enum TaskStatus {
   IN_PROGRESS = 'IN_PROGRESS',
   IN_REVIEW = 'IN_REVIEW',
   DONE = 'DONE',
-  DOING = 'DOING', // Alias for IN_PROGRESS
 }
 
 export enum TaskPriority {

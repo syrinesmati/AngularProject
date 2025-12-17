@@ -17,7 +17,8 @@ import { of } from 'rxjs';
 export const projectsResolver: ResolveFn<Project[] | null> = () => {
   const projectsService = inject(ProjectsService);
 
-  return projectsService.getAllProjects().pipe(
+  const projects =  projectsService.projects();
+  return of(projects).pipe(
     catchError((error) => {
       console.error('Failed to load projects:', error);
       return of(null);

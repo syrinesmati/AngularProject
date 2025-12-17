@@ -62,7 +62,7 @@ export class ProjectsComponent {
 
   private loadProjects() {
     this.isLoading.set(true);
-    this.projectsService.getAllProjects().subscribe({
+    this.projectsService.loadProjects().subscribe({
       next: (projects) => {
         console.log('📦 Loaded projects:', projects.length);
         
@@ -73,23 +73,23 @@ export class ProjectsComponent {
           return;
         }
 
-        const projectsWithMembers$ = projects.map(project =>
-          this.projectsService.getProjectMembers(project.id).pipe(
-            map(members => {
-              console.log(`👥 Members for ${project.name}:`, members.length, members);
-              return { ...project, members };
-            }),
-            catchError(() => {
-              console.warn(`Failed to load members for project ${project.id}`);
-              return of({ ...project, members: [] });
-            })
-          )
-        );
+      const projectsWithMembers$ = projects.map((project) =>
+        this.projectsService.loadProjectMembers(project.id).pipe(
+          map(members => {
+            console.log(`👥 Members for ${project.name}:`, members.length, members);
+            return { ...project, members };
+          }),
+          catchError(() => {
+            console.warn(`Failed to load members for project ${project.id}`);
+            return of({ ...project, members: [] });
+          })
+        )
+      );
 
         forkJoin(projectsWithMembers$).subscribe({
-          next: (enrichedProjects) => {
+          next: (enrichedProjects: any) => {
             console.log('✅ Enriched projects:', enrichedProjects);
-            this.projects.set(this.filterVisibleProjects(enrichedProjects));
+            this.projects.set(this.filterVisibleProjects(enrichedProjects as Project[]));
             this.isLoading.set(false);
           },
           error: (err) => {
@@ -99,7 +99,7 @@ export class ProjectsComponent {
           },
         });
       },
-      error: (err) => {
+      error: (err: any) => {
         console.error('Failed to load projects:', err);
         this.isLoading.set(false);
       },
@@ -108,7 +108,8 @@ export class ProjectsComponent {
 
   onProjectCreated(newProject: Project) {
     // Fetch members for the newly created project (owner is auto-added)
-    this.projectsService.getProjectMembers(newProject.id).subscribe({
+     const members = this.projectsService.getProjectMembers(newProject.id)();
+     of(members).subscribe({
       next: (members) => {
         const enrichedProject = { ...newProject, members };
         this.projects.update((current) => this.filterVisibleProjects([enrichedProject, ...current]));

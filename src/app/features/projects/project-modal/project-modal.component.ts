@@ -1,7 +1,7 @@
 import { Component, Input, Output, EventEmitter, inject, signal, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators, FormsModule } from '@angular/forms';
-import { Observable, forkJoin, of } from 'rxjs';
+import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { forkJoin, of } from 'rxjs';
 import { ProjectsService } from '../../../core/services/projects.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { UsersService } from '../../../core/services/users.service';
@@ -20,7 +20,7 @@ interface ProjectFormDto {
 @Component({
   selector: 'app-project-modal',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule],
+  imports: [CommonModule, ReactiveFormsModule],
   templateUrl: './project-modal.component.html',
   styleUrl: './project-modal.component.css',
 })
@@ -60,7 +60,6 @@ export class ProjectModalComponent implements OnChanges {
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['isOpen']) {
       const open = changes['isOpen'].currentValue;
-      console.log('Modal isOpen changed:', open, 'isEditing:', this.isEditing);
       if (open) {
         this.loadUsers();
         // Prefill form when editing
@@ -83,7 +82,6 @@ export class ProjectModalComponent implements OnChanges {
     }
 
     if (changes['projectToEdit'] && this.isOpen && this.projectToEdit) {
-      // Ensure form is patched if projectToEdit arrives after open
       this.form.patchValue({
         name: this.projectToEdit.name,
         description: this.projectToEdit.description ?? '',
@@ -98,32 +96,36 @@ export class ProjectModalComponent implements OnChanges {
   }
 
   loadUsers() {
-    console.log('🔍 loadUsers() called');
-    const current = this.authService.currentUserSignal();
+    const currentUser = this.authService.currentUserSignal();
     const projectId = this.isEditing && this.projectToEdit ? this.projectToEdit.id : null;
-    let src$ = this.usersService.getAllUsers();
-    if (projectId) {
-      if (current?.role === 'ADMIN') {
-        src$ = this.usersService.getAllUsers();
-      } else {
-        src$ = this.usersService.getAssignableUsers(projectId);
+    
+    if (currentUser?.role === 'ADMIN') {
+      this.usersService.getAllUsers().subscribe({
+        next: (users) => {
+          this.availableUsers.set(users);
+        },
+        error: (err) => {
+          console.error('Failed to load users:', err);
+        },
+      });
+    } else if (projectId) {
+      // For non-admins, use getAssignableUsers
+      this.usersService.getAssignableUsers(projectId).subscribe({
+        next: (users) => {
+          this.availableUsers.set(users);
+        },
+        error: (err) => {
+          console.error('Failed to load assignable users:', err);
+        },
+      });
+    } else {
+      // For creating new project as non-admin, only show current user
+      if (currentUser) {
+        this.availableUsers.set([currentUser]);
+        // Auto-select current user as owner
+        this.selectedOwnerIds.set([currentUser.id]);
       }
     }
-
-    src$.subscribe({
-      next: (users) => {
-        console.log('✅ Users loaded successfully:', users);
-        this.availableUsers.set(users);
-      },
-      error: (err) => {
-        console.error('❌ Failed to load users:', err);
-        console.error('Error details:', {
-          status: err.status,
-          message: err.message,
-          error: err.error
-        });
-      },
-    });
   }
 
   toggleOwner(userId: string) {
@@ -187,7 +189,6 @@ export class ProjectModalComponent implements OnChanges {
     this.selectedViewerIds.set(viewerIds);
   }
 
-  // Build desired roles map with precedence: VIEWER < EDITOR < OWNER
   private buildDesiredRoles(ownerId: string, editors: string[], viewers: string[]) {
     const desired = new Map<string, ProjectMemberRole>();
     viewers.forEach((id) => desired.set(id, ProjectMemberRole.VIEWER));
@@ -196,9 +197,8 @@ export class ProjectModalComponent implements OnChanges {
     return desired;
   }
 
-  // Create add/update/remove operations to sync members
   private buildMemberOperations(projectId: string, desiredRoles: Map<string, ProjectMemberRole>) {
-    const operations: Array<ReturnType<ProjectsService['addMember']> | ReturnType<ProjectsService['removeMember']> | ReturnType<ProjectsService['updateMemberRole']>> = [];
+    const operations: Array<any> = [];
     const existingMembers = this.projectToEdit?.members ?? [];
     const existingMap = new Map(existingMembers.map((m) => [m.userId, m]));
 
@@ -219,10 +219,9 @@ export class ProjectModalComponent implements OnChanges {
     return operations;
   }
 
-  // Resolve a friendly display name for a user id
   getUserName(userId: string): string {
     const user = this.availableUsers().find((u) => u.id === userId);
-    return user ? `${user.firstName}` : 'User';
+    return user ? `${user.firstName} ${user.lastName}`.trim() : 'User';
   }
 
   getSelectedOwnersCount(): number {
@@ -277,78 +276,80 @@ export class ProjectModalComponent implements OnChanges {
       const desiredRoles = this.buildDesiredRoles(ownerId, editors, viewers);
       const memberOps = this.buildMemberOperations(projectId, desiredRoles);
 
-      const changedFields = (
+      // Check if project fields changed
+      const projectFieldsChanged = (
         (this.projectToEdit.name ?? '') !== (updatePayload.name ?? '') ||
         (this.projectToEdit.description ?? '') !== (updatePayload.description ?? '') ||
         (this.projectToEdit.color ?? '') !== (updatePayload.color ?? '')
       );
 
-      const runMemberOps = () => {
-        const runMemberOps$: Observable<unknown> = memberOps.length ? forkJoin(memberOps) : of(null);
-        runMemberOps$.subscribe({
-          next: () => {
-            this.projectsService.getProjectMembers(projectId).subscribe({
-              next: (members) => {
-                const base = this.projectToEdit!;
-                this.projectUpdated.emit({ ...(changedFields ? base : this.projectToEdit!), ...base, members });
-                this.onClose();
+      const runMemberOperations = () => {
+        if (memberOps.length === 0) {
+          return of([] as any[]);
+        }
+        return forkJoin(memberOps);
+      };
+
+      if (projectFieldsChanged) {
+        // Update project and then members
+        this.projectsService.updateProject(projectId, updatePayload).subscribe({
+          next: (updatedProject) => {
+            runMemberOperations().subscribe({
+              next: () => {
+                // Reload members and emit updated project
+                  this.projectsService.getProjectById(projectId).subscribe({
+                    next: (projectWithMembers) => {
+                      this.projectUpdated.emit(projectWithMembers);
+                      this.onClose();
+                    },
+                    error: (err: any) => {
+                      console.warn('Project updated but failed to reload members:', err);
+                      this.projectUpdated.emit(updatedProject);
+                      this.onClose();
+                    },
+                  });
               },
-              error: (err: unknown) => {
-                console.warn('Members sync done but failed to reload members list:', err);
-                this.projectUpdated.emit(this.projectToEdit!);
-                this.onClose();
+              error: (err: any) => {
+                console.error('Failed to sync members:', err);
+                this.isSubmitting.set(false);
               },
             });
           },
-          error: (err: unknown) => {
-            console.error('Failed to sync members:', err);
+          error: (err) => {
+            console.error('Failed to update project:', err);
             this.isSubmitting.set(false);
           },
         });
-      };
-
-      if (changedFields) {
-        this.projectsService.updateProject(projectId, updatePayload).subscribe({
-          next: (updatedProject) => {
-            // After project update, sync members
-            const runMemberOps$: Observable<unknown> = memberOps.length ? forkJoin(memberOps) : of(null);
-            runMemberOps$.subscribe({
-              next: () => {
-                this.projectsService.getProjectMembers(projectId).subscribe({
-                  next: (members) => {
-                    this.projectUpdated.emit({ ...updatedProject, members });
-                    this.onClose();
-                  },
-                  error: (err: unknown) => {
-                    console.warn('Project updated but failed to reload members:', err);
-                    this.projectUpdated.emit(updatedProject);
-                    this.onClose();
-                  },
-                });
+      } else {
+        // Only update members
+        runMemberOperations().subscribe({
+          next: () => {
+            // Reload the project with updated members
+            this.projectsService.getProjectById(projectId).subscribe({
+              next: (updatedProject) => {
+                this.projectUpdated.emit(updatedProject);
+                this.onClose();
               },
-              error: (err: unknown) => {
-                console.error('Project updated but failed to sync members:', err);
+              error: (err) => {
+                console.error('Failed to reload project:', err);
                 this.isSubmitting.set(false);
               },
             });
           },
           error: (err: any) => {
-            console.error('Failed to update project:', err);
-            // Fallback: if forbidden to update fields, still try syncing members
-            if (memberOps.length) {
-              runMemberOps();
-            } else {
-              this.isSubmitting.set(false);
-            }
+            console.error('Failed to sync members:', err);
+            this.isSubmitting.set(false);
           },
         });
-      } else {
-        // No field changes; only sync members
-        runMemberOps();
       }
     } else {
-      // Create new project with owner/editors/viewers
-      const payload = { ...formValue, ownerId, editors, viewers };
+      // Create new project
+      const payload = { 
+        ...formValue, 
+        ownerId, 
+        editors, 
+        viewers 
+      };
 
       this.projectsService.createProject(payload).subscribe({
         next: (newProject) => {

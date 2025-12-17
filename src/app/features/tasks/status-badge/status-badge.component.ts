@@ -28,10 +28,6 @@ export class StatusBadgeComponent {
       label: 'Done',
       class: 'bg-status-done-bg text-status-done'
     },
-    [TaskStatus.DOING]: {
-      label: '',
-      class: ''
-    }
   };
   
   config = computed(() => this.statusConfig[this.status()]);

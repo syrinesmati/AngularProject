@@ -1,18 +1,275 @@
-<div class="container mx-auto p-6">
-  <div class="flex items-center justify-between mb-6">
-    <h1 class="text-2xl font-bold text-foreground">My Tasks</h1>
+<div class="space-y-6 animate-fade-in">
+  <!-- Header -->
+  <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+      <h1 class="text-2xl font-semibold text-foreground">Tasks</h1>
+      <p class="text-muted-foreground mt-1">
+        {{ filteredAndSortedTasks().length }} task{{ filteredAndSortedTasks().length !== 1 ? 's' : '' }}
+        @if (!isAdmin()) {
+          <span> in your projects</span>
+        }
+      </p>
+    </div>
     <button
-      (click)="navigateToCreateTask()"
-      class="inline-flex items-center justify-center h-10 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
-    >
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      (click)="openTaskModal()"
+      class="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
+      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
       </svg>
-      Create Task
+      New Task
     </button>
   </div>
 
-  <div class="text-muted-foreground">
-    <p>tasks.component works!</p>
+  <!-- Filters -->
+  <div class="flex flex-col gap-4 sm:flex-row sm:items-center flex-wrap">
+    <!-- Search -->
+    <div class="relative flex-1 max-w-sm">
+      <svg class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+      </svg>
+      <input
+        type="text"
+        [value]="searchQuery()"
+        (input)="onSearchChange($any($event.target).value)"
+        placeholder="Search tasks..."
+        class="h-10 w-full rounded-lg border border-input bg-background pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+    </div>
+
+    <!-- Project Filter -->
+    <select
+      [value]="projectFilter()"
+      (change)="onProjectFilterChange($any($event.target).value)"
+      class="w-[160px] h-10 rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+      <option value="all">All Projects</option>
+      @for (project of availableProjects(); track project.id) {
+        <option [value]="project.id">
+          {{ project.name }}
+        </option>
+      }
+    </select>
+
+    <!-- Status Filter -->
+    <select
+      [value]="statusFilter()"
+      (change)="onStatusFilterChange($any($event.target).value)"
+      class="w-[140px] h-10 rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+      <option value="all">All Status</option>
+      <option value="TODO">To Do</option>
+      <option value="IN_PROGRESS">In Progress</option>
+      <option value="IN_REVIEW">In Review</option>
+      <option value="DONE">Done</option>
+    </select>
+
+    <!-- Priority Filter -->
+    <select
+      [value]="priorityFilter()"
+      (change)="onPriorityFilterChange($any($event.target).value)"
+      class="w-[140px] h-10 rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+      <option value="all">All Priority</option>
+      <option value="LOW">Low</option>
+      <option value="MEDIUM">Medium</option>
+      <option value="HIGH">High</option>
+      <option value="URGENT">Urgent</option>
+    </select>
+
+    <!-- Label Filter -->
+    <select
+      [value]="labelFilter()"
+      (change)="onLabelFilterChange($any($event.target).value)"
+      class="w-[160px] h-10 rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+      <option value="all">All Labels</option>
+      @for (label of availableLabels(); track label.id) {
+        <option [value]="label.id">{{ label.name }}</option>
+      }
+    </select>
+
+    <!-- Clear Filters -->
+    @if (hasFilters()) {
+      <button
+        (click)="clearFilters()"
+        class="h-10 px-3 rounded-lg border border-input bg-background text-sm hover:bg-accent transition-colors">
+        Clear Filters
+      </button>
+    }
+
+    <!-- View Mode Toggle -->
+    <div class="flex rounded-lg border border-border p-1 ml-auto">
+      <button
+        (click)="setViewMode('grid')"
+        [class]="viewMode() === 'grid' 
+          ? 'h-8 w-8 rounded bg-secondary flex items-center justify-center' 
+          : 'h-8 w-8 rounded hover:bg-accent flex items-center justify-center transition-colors'">
+        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+        </svg>
+      </button>
+      <button
+        (click)="setViewMode('table')"
+        [class]="viewMode() === 'table' 
+          ? 'h-8 w-8 rounded bg-secondary flex items-center justify-center' 
+          : 'h-8 w-8 rounded hover:bg-accent flex items-center justify-center transition-colors'">
+        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+        </svg>
+      </button>
+    </div>
   </div>
+
+  <!-- Loading State -->
+  @if (isLoading()) {
+    <div class="flex items-center justify-center py-12">
+      <svg class="animate-spin h-8 w-8 text-primary" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+      </svg>
+    </div>
+  } @else {
+    <!-- Empty State -->
+    @if (filteredAndSortedTasks().length === 0) {
+      <app-empty-state
+        [title]="hasFilters() ? 'No matching tasks' : 'No tasks yet'"
+        [description]="hasFilters() ? 'Try adjusting your filters' : 'Get started by creating your first task'"
+        [actionLabel]="hasFilters() ? 'Clear Filters' : 'Create Task'"
+        (action)="hasFilters() ? clearFilters() : openTaskModal()"
+      />
+    } @else {
+      <!-- Grid View -->
+      @if (viewMode() === 'grid') {
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          @for (task of filteredAndSortedTasks(); track task.id) {
+            <app-task-card
+              [task]="task"
+              [showProject]="projectFilter() === 'all'"
+              [project]="getProjectById(task.projectId)"
+              (cardClick)="openTaskModal(task)"
+            />
+          }
+        </div>
+      }
+
+      <!-- Table View -->
+      @if (viewMode() === 'table') {
+        <div class="rounded-lg border border-border bg-card shadow-soft overflow-hidden">
+          <table class="w-full">
+            <thead class="border-b border-border bg-muted/50">
+              <tr>
+                <th 
+                  (click)="toggleSort('title')"
+                  class="text-left px-4 py-3 text-sm font-medium cursor-pointer hover:bg-muted transition-colors">
+                  <div class="flex items-center gap-1">
+                    Title
+                    <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                    </svg>
+                  </div>
+                </th>
+                <th class="text-left px-4 py-3 text-sm font-medium">Project</th>
+                <th 
+                  (click)="toggleSort('status')"
+                  class="text-left px-4 py-3 text-sm font-medium cursor-pointer hover:bg-muted transition-colors">
+                  <div class="flex items-center gap-1">
+                    Status
+                    <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                    </svg>
+                  </div>
+                </th>
+                <th 
+                  (click)="toggleSort('priority')"
+                  class="text-left px-4 py-3 text-sm font-medium cursor-pointer hover:bg-muted transition-colors">
+                  <div class="flex items-center gap-1">
+                    Priority
+                    <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                    </svg>
+                  </div>
+                </th>
+                <th 
+                  (click)="toggleSort('dueDate')"
+                  class="text-left px-4 py-3 text-sm font-medium cursor-pointer hover:bg-muted transition-colors">
+                  <div class="flex items-center gap-1">
+                    Due Date
+                    <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                    </svg>
+                  </div>
+                </th>
+                <th class="text-left px-4 py-3 text-sm font-medium">Assignee</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (task of filteredAndSortedTasks(); track task.id) {
+                <tr 
+                  (click)="openTaskModal(task)"
+                  class="border-b border-border cursor-pointer hover:bg-muted/50 transition-colors">
+                  <td class="px-4 py-3">
+                    <div class="font-medium text-sm">{{ task.title }}</div>
+                    @if (task.labels && task.labels.length > 0) {
+                      <div class="flex gap-1 mt-1">
+                        @for (label of task.labels; track label.id) {
+                          <span
+                            [style.background-color]="label.color"
+                            class="inline-block rounded-full px-1.5 py-0 text-[10px] font-medium text-white">
+                            {{ label.name }}
+                          </span>
+                        }
+                      </div>
+                    }
+                  </td>
+                  <td class="px-4 py-3">
+                    @if (getProjectById(task.projectId); as project) {
+                      <div class="flex items-center gap-2">
+                        <div
+                          class="h-2 w-2 rounded-full"
+                          [style.background-color]="project.color">
+                        </div>
+                        <span class="text-sm">{{ project.name }}</span>
+                      </div>
+                    }
+                  </td>
+                  <td class="px-4 py-3">
+                    <app-status-badge [status]="task.status" />
+                  </td>
+                  <td class="px-4 py-3">
+                    <app-priority-badge [priority]="task.priority" />
+                  </td>
+                  <td class="px-4 py-3">
+                    @if (task.dueDate) {
+                      <span class="text-sm text-muted-foreground">
+                        {{ task.dueDate | date:'MMM d, yyyy' }}
+                      </span>
+                    } @else {
+                      <span class="text-sm text-muted-foreground">-</span>
+                    }
+                  </td>
+                  <td class="px-4 py-3">
+                    @if (task.assignees && task.assignees.length > 0) {
+                      <div class="flex items-center gap-2">
+                        <div class="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-medium">
+                          {{ getAssigneeInitials(task) }}
+                        </div>
+                        <span class="text-sm">
+                          {{ task.assignees[0].firstName }} {{ task.assignees[0].lastName }}
+                        </span>
+                      </div>
+                    } @else {
+                      <span class="text-sm text-muted-foreground">Unassigned</span>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    }
+  }
 </div>
+
+<!-- Task Modal -->
+<app-task-modal
+  [task]="selectedTask()"
+  [open]="isModalOpen()"
+  [defaultProjectId]="projectFilter() !== 'all' ? projectFilter() : undefined"
+  (openChange)="onModalOpenChange($event)"
+/>

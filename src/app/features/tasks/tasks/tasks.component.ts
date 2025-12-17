@@ -1,18 +1,295 @@
-import { Component } from '@angular/core';
-import { Router } from '@angular/router';
+import { Component, OnInit, signal, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+
+import { TasksService, FilterTaskDto } from '../../../core/services/task.service';
+import { ProjectsService } from '../../../core/services/projects.service';
+import { LabelsService } from '../../../core/services/labels.service';
+import { AuthService } from '../../../core/services/auth.service';
+import { Task, TaskStatus, TaskPriority, Label } from '../../../core/models/task.model';
+import { Project } from '../../../core/models/project.model';
+
+import { TaskCardComponent } from '../task-card/task-card.component';
+import { TaskModalComponent } from '../task-modal/task-modal.component';
+import { EmptyStateComponent } from '../empty-state/empty-state.component';
+import { StatusBadgeComponent } from '../status-badge/status-badge.component';
+import { PriorityBadgeComponent } from '../priority-badge/priority-badge.component';
+
+type SortField = 'title' | 'priority' | 'dueDate' | 'status';
+type SortOrder = 'asc' | 'desc';
+type ViewMode = 'grid' | 'table';
+
+const priorityOrder: Record<TaskPriority, number> = { 
+  URGENT: 4,
+  HIGH: 3, 
+  MEDIUM: 2, 
+  LOW: 1 
+};
+
+const statusOrder: Record<TaskStatus, number> = { 
+  TODO: 1, 
+  IN_PROGRESS: 2,
+  IN_REVIEW: 3,
+  DONE: 4 
+};
 
 @Component({
-  selector: 'app-tasks.component',
+  selector: 'app-tasks',
   standalone: true,
-  imports: [CommonModule],
+  imports: [
+    CommonModule,
+    FormsModule,
+    TaskCardComponent,
+    TaskModalComponent,
+    EmptyStateComponent,
+    StatusBadgeComponent,
+    PriorityBadgeComponent
+  ],
   templateUrl: './tasks.component.html',
-  styleUrl: './tasks.component.css',
+  styleUrl: './tasks.component.css'
 })
-export class TasksComponent {
-  constructor(private router: Router) {}
+export class TasksComponent implements OnInit {
+  private tasksService = inject(TasksService);
+  private projectsService = inject(ProjectsService);
+  private labelsService = inject(LabelsService);
+  private authService = inject(AuthService);
 
-  navigateToCreateTask(): void {
-    this.router.navigate(['/tasks/new']);
+  // State signals
+  isLoading = signal(true);
+  tasks = signal<Task[]>([]);
+  selectedTask = signal<Task | null>(null);
+  isModalOpen = signal(false);
+  
+  // Filter signals
+  searchQuery = signal('');
+  statusFilter = signal<TaskStatus | 'all'>('all');
+  priorityFilter = signal<TaskPriority | 'all'>('all');
+  projectFilter = signal<string>('all');
+  labelFilter = signal<string>('all');
+  
+  // Sorting & view
+  sortField = signal<SortField>('dueDate');
+  sortOrder = signal<SortOrder>('asc');
+  viewMode = signal<ViewMode>('grid');
+
+  // Data from services
+  user = this.authService.currentUserSignal;
+  isAdmin = this.authService.isAdmin;
+  availableProjects = this.projectsService.projects;
+  availableLabels = this.labelsService.labels;
+
+  // Computed
+  filteredAndSortedTasks = computed(() => {
+    let result = [...this.tasks()];
+
+    // Search filter
+    const query = this.searchQuery().toLowerCase();
+    if (query) {
+      result = result.filter(task =>
+        task.title.toLowerCase().includes(query) ||
+        task.description?.toLowerCase().includes(query)
+      );
+    }
+
+    // Status filter
+    if (this.statusFilter() !== 'all') {
+      result = result.filter(task => task.status === this.statusFilter());
+    }
+
+    // Priority filter
+    if (this.priorityFilter() !== 'all') {
+      result = result.filter(task => task.priority === this.priorityFilter());
+    }
+
+    // Project filter
+    if (this.projectFilter() !== 'all') {
+      result = result.filter(task => task.projectId === this.projectFilter());
+    }
+
+    // Label filter
+    if (this.labelFilter() !== 'all') {
+      result = result.filter(task => 
+        task.labels?.some(l => l.id === this.labelFilter())
+      );
+    }
+
+    // Sort
+    result.sort((a, b) => {
+      let comparison = 0;
+      
+      switch (this.sortField()) {
+        case 'title':
+          comparison = a.title.localeCompare(b.title);
+          break;
+        case 'priority':
+          comparison = priorityOrder[b.priority] - priorityOrder[a.priority];
+          break;
+        case 'status':
+          comparison = statusOrder[a.status] - statusOrder[b.status];
+          break;
+        case 'dueDate':
+          const dateA = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+          const dateB = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+          comparison = dateA - dateB;
+          break;
+      }
+      
+      return this.sortOrder() === 'asc' ? comparison : -comparison;
+    });
+
+    return result;
+  });
+
+  hasFilters = computed(() => {
+    return this.searchQuery() !== '' ||
+           this.statusFilter() !== 'all' ||
+           this.priorityFilter() !== 'all' ||
+           this.projectFilter() !== 'all' ||
+           this.labelFilter() !== 'all';
+  });
+
+  ngOnInit() {
+    this.loadData();
+  }
+
+  private loadData() {
+    this.isLoading.set(true);
+
+    // Load projects
+    this.projectsService.loadProjects().subscribe();
+
+    // Load labels
+    this.labelsService.getAllLabels().subscribe();
+
+    // Load tasks
+    this.loadTasks();
+  }
+
+  private loadTasks() {
+    const filters: FilterTaskDto = {};
+
+    // Only add filters if they're set
+    if (this.statusFilter() !== 'all') {
+      filters.status = this.statusFilter() as TaskStatus;
+    }
+    if (this.priorityFilter() !== 'all') {
+      filters.priority = this.priorityFilter() as TaskPriority;
+    }
+    if (this.labelFilter() !== 'all') {
+      filters.labelId = this.labelFilter();
+    }
+    if (this.searchQuery()) {
+      filters.search = this.searchQuery();
+    }
+
+    // Load tasks based on project filter
+    if (this.projectFilter() !== 'all') {
+      this.tasksService.getTasksByProject(this.projectFilter(), filters).subscribe({
+        next: (response) => {
+          this.tasks.set(response.data);
+          this.isLoading.set(false);
+        },
+        error: (error) => {
+          console.error('Failed to load tasks:', error);
+          this.isLoading.set(false);
+        }
+      });
+    } else {
+      this.tasksService.getMyTasks(filters).subscribe({
+        next: (response) => {
+          this.tasks.set(response);
+          this.isLoading.set(false);
+        },
+        error: (error) => {
+          console.error('Failed to load tasks:', error);
+          this.isLoading.set(false);
+        }
+      });
+    }
+  }
+
+  // Filter methods
+  onSearchChange(query: string) {
+    this.searchQuery.set(query);
+    this.loadTasks();
+  }
+
+  onStatusFilterChange(status: string) {
+    this.statusFilter.set(status as TaskStatus | 'all');
+    this.loadTasks();
+  }
+
+  onPriorityFilterChange(priority: string) {
+    this.priorityFilter.set(priority as TaskPriority | 'all');
+    this.loadTasks();
+  }
+
+  onProjectFilterChange(projectId: string) {
+    this.projectFilter.set(projectId);
+    this.loadTasks();
+  }
+
+  onLabelFilterChange(labelId: string) {
+    this.labelFilter.set(labelId);
+    this.loadTasks();
+  }
+
+  clearFilters() {
+    this.searchQuery.set('');
+    this.statusFilter.set('all');
+    this.priorityFilter.set('all');
+    this.projectFilter.set('all');
+    this.labelFilter.set('all');
+    this.loadTasks();
+  }
+
+  // Sorting methods
+  toggleSort(field: SortField) {
+    if (this.sortField() === field) {
+      this.sortOrder.set(this.sortOrder() === 'asc' ? 'desc' : 'asc');
+    } else {
+      this.sortField.set(field);
+      this.sortOrder.set('asc');
+    }
+  }
+
+  // View methods
+  setViewMode(mode: ViewMode) {
+    this.viewMode.set(mode);
+  }
+
+  // Task actions
+  openTaskModal(task?: Task) {
+    this.selectedTask.set(task || null);
+    this.isModalOpen.set(true);
+  }
+
+  closeTaskModal() {
+    this.isModalOpen.set(false);
+    this.selectedTask.set(null);
+  }
+
+  onModalOpenChange(open: boolean) {
+    if (!open) {
+      this.closeTaskModal();
+    }
+  }
+
+  onTaskSaved() {
+    this.loadTasks();
+  }
+
+  // Helper method to get project details
+  getProjectById(projectId: string): { name: string; color: string } | null {
+    const project = this.availableProjects()?.find(p => p.id === projectId);
+    return project ? { name: project.name, color: project.color ? project.color : '#000000' } : null;
+  }
+
+  // Helper for assignee display
+  getAssigneeInitials(task: Task): string {
+    const assignees = task.assignees;
+    if (!assignees || assignees.length === 0) return 'U';
+    const first = assignees[0];
+    return first.firstName?.charAt(0)?.toUpperCase() || 'U';
   }
 }

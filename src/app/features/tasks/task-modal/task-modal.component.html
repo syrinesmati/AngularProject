@@ -1,1 +1,323 @@
-<p>task-modal.component works!</p>
+<!-- Modal Backdrop -->
+@if (open) {
+<div
+  class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+  (click)="onOpenChange(false)"
+>
+  <!-- Modal Content -->
+  <div
+    class="relative bg-card border border-border rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden"
+    (click)="$event.stopPropagation()"
+  >
+    <!-- Header -->
+    <div class="flex items-center justify-between p-6 border-b border-border">
+      <h2 class="text-xl font-semibold text-foreground">
+        {{ isEditing ? 'Edit Task' : 'Create New Task' }}
+      </h2>
+      <button
+        type="button"
+        (click)="onOpenChange(false)"
+        class="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+      >
+        <lucide-icon name="x" class="h-5 w-5"></lucide-icon>
+      </button>
+    </div>
+
+    <!-- Form -->
+    <form (ngSubmit)="onSubmit($event)" class="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
+      <!-- Tabs -->
+      <div class="mb-6">
+        <div class="grid grid-cols-3 gap-2 border-b border-border">
+          <button
+            type="button"
+            [class.border-b-2]="activeTab === 'details'"
+            [class.border-primary]="activeTab === 'details'"
+            [class.text-foreground]="activeTab === 'details'"
+            [class.text-muted-foreground]="activeTab !== 'details'"
+            (click)="activeTab = 'details'"
+            class="py-2 text-sm font-medium text-center transition-colors hover:text-foreground"
+          >
+            Details
+          </button>
+          <button
+            type="button"
+            [class.border-b-2]="activeTab === 'comments'"
+            [class.border-primary]="activeTab === 'comments'"
+            [class.text-foreground]="activeTab === 'comments'"
+            [class.text-muted-foreground]="activeTab !== 'comments'"
+            (click)="activeTab = 'comments'"
+            class="py-2 text-sm font-medium text-center transition-colors hover:text-foreground"
+          >
+            Comments {{ getCommentsCount() > 0 ? '(' + getCommentsCount() + ')' : '' }}
+          </button>
+          <button
+            type="button"
+            [class.border-b-2]="activeTab === 'attachments'"
+            [class.border-primary]="activeTab === 'attachments'"
+            [class.text-foreground]="activeTab === 'attachments'"
+            [class.text-muted-foreground]="activeTab !== 'attachments'"
+            (click)="activeTab = 'attachments'"
+            class="py-2 text-sm font-medium text-center transition-colors hover:text-foreground"
+          >
+            Attachments {{ getAttachmentsCount() > 0 ? '(' + getAttachmentsCount() + ')' : '' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Details Tab -->
+      @if (activeTab === 'details') {
+      <div class="space-y-4">
+        <!-- Title -->
+        <div>
+          <label for="title" class="block text-sm font-medium text-foreground mb-1.5">
+            Title <span class="text-destructive">*</span>
+          </label>
+          <input
+            #titleInput
+            id="title"
+            type="text"
+            [(ngModel)]="formData.title"
+            name="title"
+            placeholder="Enter task title"
+            class="w-full px-3 py-2 text-sm rounded-md bg-background border border-input text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            [class.border-destructive]="errors['title']"
+          />
+          @if (errors['title']) {
+          <p class="text-xs text-destructive mt-1">{{ errors['title'] }}</p>
+          }
+        </div>
+
+        <!-- Project -->
+        <div>
+          <label class="block text-sm font-medium text-foreground mb-1.5">
+            Project <span class="text-destructive">*</span>
+          </label>
+          <select
+            [(ngModel)]="formData.projectId"
+            name="projectId"
+            (change)="onProjectChange()"
+            class="w-full px-3 py-2 text-sm rounded-md bg-background border border-input text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            [class.border-destructive]="errors['projectId']"
+          >
+            <option value="" disabled selected>Select a project</option>
+            @for (project of availableProjects; track project.id) {
+            <option [value]="project.id">
+              {{ project.name }}
+            </option>
+            }
+          </select>
+          @if (errors['projectId']) {
+          <p class="text-xs text-destructive mt-1">{{ errors['projectId'] }}</p>
+          }
+        </div>
+
+        <!-- Labels -->
+        <div>
+          <label class="block text-sm font-medium text-foreground mb-1.5">
+            Labels
+          </label>
+          <app-label-select
+            [availableLabels]="availableLabels"
+            [selectedLabels]="formData.labels"
+          ></app-label-select>
+        </div>
+
+        <!-- Description -->
+        <div>
+          <label for="description" class="block text-sm font-medium text-foreground mb-1.5">
+            Description
+          </label>
+          <textarea
+            id="description"
+            [(ngModel)]="formData.description"
+            name="description"
+            rows="3"
+            placeholder="Add a description..."
+            class="w-full px-3 py-2 text-sm rounded-md bg-background border border-input text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+          ></textarea>
+        </div>
+
+        <!-- Status & Priority -->
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-foreground mb-1.5">
+              Status
+            </label>
+            <select
+              [(ngModel)]="formData.status"
+              name="status"
+              class="w-full px-3 py-2 text-sm rounded-md bg-background border border-input text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option [value]="TaskStatus.TODO">To Do</option>
+              <option [value]="TaskStatus.IN_PROGRESS">In Progress</option>
+              <option [value]="TaskStatus.DONE">Done</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-foreground mb-1.5">
+              Priority
+            </label>
+            <select
+              [(ngModel)]="formData.priority"
+              name="priority"
+              class="w-full px-3 py-2 text-sm rounded-md bg-background border border-input text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option [value]="TaskPriority.LOW">Low</option>
+              <option [value]="TaskPriority.MEDIUM">Medium</option>
+              <option [value]="TaskPriority.HIGH">High</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Due Date & Assignee -->
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-foreground mb-1.5">
+              Due Date
+            </label>
+            <div class="relative">
+              <input
+                type="date"
+                [ngModel]="formatDate(formData.dueDate)"
+                (ngModelChange)="formData.dueDate = parseDate($event)"
+                name="dueDate"
+                class="w-full px-3 py-2 text-sm rounded-md bg-background border border-input text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+              <lucide-icon
+                name="calendar"
+                class="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none"
+              ></lucide-icon>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-foreground mb-1.5">
+              Assignee
+            </label>
+            <select
+              [(ngModel)]="formData.assigneeId"
+              name="assigneeId"
+              class="w-full px-3 py-2 text-sm rounded-md bg-background border border-input text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="" disabled>Select assignee</option>
+              @for (user of assignees; track user.id) {
+              <option [value]="user.id">{{ user.firstName }} {{ user.lastName }}</option>
+              }
+            </select>
+          </div>
+        </div>
+
+        <!-- Subtasks -->
+        <div>
+          <label class="block text-sm font-medium text-foreground mb-1.5">
+            Subtasks
+          </label>
+          <div class="flex gap-2 mb-2">
+            <input
+              type="text"
+              [(ngModel)]="newSubtask"
+              name="newSubtask"
+              placeholder="Add a subtask..."
+              (keydown)="onKeyDown($event)"
+              class="flex-1 px-3 py-2 text-sm rounded-md bg-background border border-input text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+            <button
+              type="button"
+              (click)="addSubtask()"
+              class="px-3 py-2 rounded-md bg-muted text-foreground hover:bg-muted/80 transition-colors"
+            >
+              <lucide-icon name="plus" class="h-4 w-4"></lucide-icon>
+            </button>
+          </div>
+
+          @if (formData.subtasks.length > 0) {
+          <div class="space-y-2 rounded-lg border border-border p-3">
+            @for (subtask of formData.subtasks; track subtask.id) {
+            <div class="flex items-center gap-2 group">
+              <input
+                type="checkbox"
+                [checked]="subtask.isComplete"
+                (change)="toggleSubtask(subtask.id)"
+                class="rounded border-input text-primary focus:ring-2 focus:ring-ring"
+              />
+              <span
+                [class.line-through]="subtask.isComplete"
+                [class.text-muted-foreground]="subtask.isComplete"
+                class="flex-1 text-sm"
+              >
+                {{ subtask.title }}
+              </span>
+              <button
+                type="button"
+                (click)="removeSubtask(subtask.id)"
+                class="p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted"
+              >
+                <lucide-icon name="x" class="h-3 w-3"></lucide-icon>
+              </button>
+            </div>
+            }
+          </div>
+          }
+        </div>
+      </div>
+      }
+
+      <!-- Comments Tab -->
+      @if (activeTab === 'comments') {
+      <div class="space-y-4">
+        <app-comment-section
+          [comments]="formData.comments"
+          [availableUsers]="assignees"
+          [currentUserId]="currentUser?.id || ''"
+          (addComment)="onAddComment($event)"
+        ></app-comment-section>
+      </div>
+      }
+
+      <!-- Attachments Tab -->
+      @if (activeTab === 'attachments') {
+      <div class="space-y-4">
+        <app-attachment-section
+          [attachments]="formData.attachments"
+          (addAttachment)="onAddAttachment($event)"
+          (removeAttachment)="onRemoveAttachment($event)"
+        ></app-attachment-section>
+      </div>
+      }
+
+      <!-- Actions -->
+      <div class="flex items-center justify-between pt-6 mt-6 border-t border-border">
+        @if (isEditing) {
+        <button
+          type="button"
+          (click)="onDelete()"
+          class="px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive/10 rounded-md transition-colors"
+        >
+          <lucide-icon name="trash2" class="mr-2 h-4 w-4 inline"></lucide-icon>
+          Delete
+        </button>
+        } @else {
+        <div></div>
+        }
+        
+        <div class="flex gap-3">
+          <button
+            type="button"
+            (click)="onOpenChange(false)"
+            class="px-4 py-2 text-sm font-medium text-foreground hover:bg-muted rounded-md transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            class="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 rounded-md transition-colors"
+          >
+            {{ isEditing ? 'Save Changes' : 'Create Task' }}
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+}
