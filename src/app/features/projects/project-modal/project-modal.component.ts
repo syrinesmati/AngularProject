@@ -220,8 +220,12 @@ export class ProjectModalComponent implements OnChanges {
   }
 
   getUserName(userId: string): string {
-    const user = this.availableUsers().find((u) => u.id === userId);
-    return user ? `${user.firstName} ${user.lastName}`.trim() : 'User';
+    const users = this.getAvailableUsers(); // Use safe getter
+    if (users.length === 0) return 'User';
+    const user = users.find((u) => u.id === userId);
+    if (!user) return 'User';
+    const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
+    return fullName || user.email || 'User';
   }
 
   getSelectedOwnersCount(): number {
@@ -234,6 +238,23 @@ export class ProjectModalComponent implements OnChanges {
 
   getSelectedViewersCount(): number {
     return this.selectedViewerIds().length;
+  }
+
+  // Safe access to available users
+  getAvailableUsers(): User[] {
+    const users = this.availableUsers();
+    // Ensure we always return an array
+    if (!users) return [];
+    if (!Array.isArray(users)) {
+      console.warn('⚠️ availableUsers is not an array:', users);
+      return [];
+    }
+    return users;
+  }
+
+  isUsersLoading(): boolean {
+    const users = this.availableUsers();
+    return !users || users.length === 0;
   }
 
   getColorName(hexColor: string): string {

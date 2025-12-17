@@ -35,15 +35,13 @@
         >
           <lucide-icon name="Settings" [size]="14"></lucide-icon>
         </button>
-        @if (hasUnreadNotifications()) {
         <button
           (click)="markAllAsRead()"
-          class="flex items-center gap-1 text-xs text-primary hover:underline"
+          class="p-1 rounded-md hover:bg-accent transition-colors"
+          title="Mark all as read"
         >
-          <lucide-icon name="check-check" [size]="14"></lucide-icon>
-          Mark all read
+          <lucide-icon name="CheckCheck" [size]="16"></lucide-icon>
         </button>
-        }
       </div>
     </div>
 
@@ -124,7 +122,7 @@
     <!-- Loading/Error States -->
     @if (loading()) {
     <div class="p-8 text-center">
-      <lucide-icon name="RefreshCw" [size]="24" class="mx-auto animate-spin text-muted-foreground"></lucide-icon>
+      <div class="w-6 h-6 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin mx-auto"></div>
       <p class="mt-2 text-sm text-muted-foreground">Loading notifications...</p>
     </div>
     } @else if (error()) {
@@ -144,10 +142,13 @@
       @if (filteredNotifications().length > 0) {
       @for (notification of filteredNotifications(); track notification.id) {
       <div class="relative group">
-        <button
-          (click)="markAsRead(notification.id)"
-          class="flex w-full gap-3 px-4 py-3 text-left transition-colors border-b border-border last:border-0"
+        <div
+          (click)="notification.isRead || markAsRead(notification.id)"
+          class="flex w-full gap-3 px-4 py-3 text-left transition-colors border-b border-border last:border-0 cursor-pointer"
           [ngClass]="!notification.isRead ? 'bg-accent/50 hover:bg-accent' : 'hover:bg-accent'"
+          (touchstart)="onTouchStart($event, notification.id)"
+          (touchmove)="onTouchMove($event, notification.id)"
+          (touchend)="onTouchEnd($event, notification.id)"
         >
           <div
             class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
@@ -171,7 +172,7 @@
               {{ getTimeAgo(notification.createdAt) }}
             </p>
           </div>
-        </button>
+        </div>
         <!-- Delete button (shown on hover) -->
         <button
           (click)="deleteNotification(notification.id)"
@@ -197,11 +198,13 @@
 
     <!-- Footer -->
     <div class="p-2 border-t border-border">
-      <button
-        class="w-full rounded-sm px-2 py-2 text-sm text-center hover:bg-accent transition-colors"
+      <a
+        routerLink="/notifications"
+        (click)="showDropdown.set(false)"
+        class="block w-full rounded-sm px-2 py-2 text-sm text-center hover:bg-accent transition-colors"
       >
         View all notifications
-      </button>
+      </a>
     </div>
   </div>
   }

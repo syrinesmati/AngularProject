@@ -1,5 +1,6 @@
 import { Component, signal, inject, computed, effect, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { formatDistanceToNow } from 'date-fns';
 import { LucideIconComponent } from '../../shared/components/lucide-icon/lucide-icon.component';
 import { NotificationsService } from '../../core/services/notifications.service';
@@ -8,7 +9,7 @@ import { Notification, NotificationType } from '../../core/models/notification.m
 @Component({
   selector: 'app-notifications-dropdown',
   standalone: true,
-  imports: [CommonModule, LucideIconComponent],
+  imports: [CommonModule, RouterLink, LucideIconComponent],
   templateUrl: './notifications-dropdown.component.html',
   styleUrls: ['./notifications-dropdown.component.css'],
 })
@@ -144,6 +145,67 @@ export class NotificationsDropdownComponent implements OnInit {
       [NotificationType.MENTION]: 'bg-pink-500/10 text-pink-600',
     };
     return colors[type] || 'bg-gray-500/10 text-gray-600';
+  }
+
+  // Swipe gesture methods
+  private swipeStartX: number = 0;
+  private swipeElement: HTMLElement | null = null;
+  private isSwiping: boolean = false;
+
+  onTouchStart(event: TouchEvent, notificationId: string): void {
+    if (!notificationId) return;
+
+    const touch = event.touches[0];
+    this.swipeStartX = touch.clientX;
+    this.swipeElement = event.target as HTMLElement;
+    this.isSwiping = false;
+  }
+
+  onTouchMove(event: TouchEvent, notificationId: string): void {
+    if (!notificationId || !this.swipeElement) return;
+
+    event.preventDefault();
+    const touch = event.touches[0];
+    const deltaX = touch.clientX - this.swipeStartX;
+
+    // Only consider it a swipe if moved more than 10px
+    if (Math.abs(deltaX) > 10) {
+      this.isSwiping = true;
+    }
+
+    // Apply transform for visual feedback
+    const maxSwipe = 60;
+    const offset = Math.max(-maxSwipe, Math.min(maxSwipe, deltaX));
+    this.swipeElement.style.transform = `translateX(${offset}px)`;
+  }
+
+  onTouchEnd(event: TouchEvent, notificationId: string): void {
+    if (!notificationId || !this.swipeElement) return;
+
+    const transform = this.swipeElement.style.transform;
+    const offset = transform ? parseFloat(transform.replace('translateX(', '').replace('px)', '')) : 0;
+
+    // Reset transform
+    this.swipeElement.style.transform = '';
+
+    const threshold = 40; // Minimum distance to trigger action
+
+    if (this.isSwiping && Math.abs(offset) > threshold) {
+      event.preventDefault(); // Prevent click event
+
+      if (offset > 0) {
+        // Swipe right - mark as read
+        this.markAsRead(notificationId);
+      } else {
+        // Swipe left - delete
+        this.deleteNotification(notificationId);
+      }
+    }
+
+    // Reset swipe state
+    this.swipeStartX = 0;
+    this.swipeElement = null;
+    this.isSwiping = false;
   }
 
   private playNotificationSound(): void {

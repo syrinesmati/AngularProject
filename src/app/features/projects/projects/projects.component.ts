@@ -9,6 +9,7 @@ import { Project, ProjectMemberRole } from '../../../core/models/project.model';
 import { UserRole } from '../../../core/models/user.model';
 import { ProjectCardComponent } from '../project-card/project-card.component';
 import { ProjectModalComponent } from '../project-modal/project-modal.component';
+import { TasksService } from '../../../core/services/task.service';
 
 @Component({
   selector: 'app-projects.component',
@@ -20,6 +21,7 @@ import { ProjectModalComponent } from '../project-modal/project-modal.component'
 export class ProjectsComponent {
   private projectsService = inject(ProjectsService);
   private authService = inject(AuthService);
+  private tasksService = inject(TasksService);
 
   currentUser = this.authService.currentUserSignal;
   UserRole = UserRole;
@@ -40,9 +42,13 @@ export class ProjectsComponent {
     let list = this.projects();
 
     if (user?.role === UserRole.ADMIN) {
+      // Admins can filter by archive state
       const mode = this.adminFilter();
       if (mode === 'active') list = list.filter((p) => !p.isArchived);
       if (mode === 'archived') list = list.filter((p) => p.isArchived);
+    } else {
+      // Regular users should NOT see archived projects
+      list = list.filter((p) => !p.isArchived);
     }
 
     if (!query) return list;
@@ -54,6 +60,8 @@ export class ProjectsComponent {
   });
 
   constructor() {
+
+    
     // Load projects on init
     effect(() => {
       this.loadProjects();
@@ -173,14 +181,8 @@ export class ProjectsComponent {
   private filterVisibleProjects(projects: Project[]): Project[] {
     const user = this.currentUser();
     if (!user) return [];
-    if (user.role === UserRole.ADMIN) return projects;
-
-    return projects.filter((project) => {
-      if (project.isArchived) return false;
-      if (project.ownerId === user.id) return true;
-      const members = project.members ?? [];
-      return members.some((m) => m.userId === user.id);
-    });
+    // Backend already scopes non-admin visibility; return as-is. Admins are already included by backend too.
+    return projects;
   }
 
   onArchiveProject(project: Project) {

@@ -266,7 +266,7 @@ export class ProjectsService extends BaseService {
    * Add a member to the project
    */
   addMember(projectId: string, dto: AddMemberDto): Observable<ProjectMember> {
-    return this.http.post<{ data: ProjectMember }>(this.buildUrl(`/projects/${projectId}/members`), dto).pipe(
+    return this.http.post<ApiResponse<ProjectMember>>(this.buildUrl(`/projects/${projectId}/members`), dto).pipe(
       map(response => response.data),
       tap((member) => {
         // Update members cache
@@ -307,10 +307,11 @@ export class ProjectsService extends BaseService {
     memberId: string,
     dto: UpdateMemberDto
   ): Observable<ProjectMember> {
-    return this.http.patch<ProjectMember>(
+    return this.http.patch<ApiResponse<ProjectMember>>(
       this.buildUrl(`/projects/${projectId}/members/${memberId}`),
       dto
     ).pipe(
+      map(response => response.data),
       tap((updatedMember) => {
         // Update members cache
         this._projectMembers.update(current => {
@@ -351,7 +352,8 @@ export class ProjectsService extends BaseService {
    * Remove a member from the project
    */
   removeMember(projectId: string, memberId: string): Observable<void> {
-    return this.http.delete<void>(this.buildUrl(`/projects/${projectId}/members/${memberId}`)).pipe(
+    return this.http.delete<ApiResponse<void>>(this.buildUrl(`/projects/${projectId}/members/${memberId}`)).pipe(
+      map(response => response.data),
       tap(() => {
         // Update members cache
         this._projectMembers.update(current => {
