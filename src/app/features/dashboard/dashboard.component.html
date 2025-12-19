@@ -184,3 +184,11 @@
     </div>
   }
 </div>
+
+<!-- Task Modal -->
+<app-task-modal
+  [task]="selectedTask()"
+  [open]="isModalOpen()"
+  [defaultProjectId]="projectFilter() !== 'all' ? projectFilter() : undefined"
+  (openChange)="onModalOpenChange($event)"
+/>

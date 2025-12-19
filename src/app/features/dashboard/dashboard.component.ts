@@ -8,9 +8,10 @@ import { map, catchError } from 'rxjs/operators';
 import { AuthService } from '../../core/services/auth.service';
 import { TasksService } from '../../core/services/task.service';
 import { ProjectsService } from '../../core/services/projects.service';
-import { Task, TaskStatus, TaskPriority } from '../../core/models/task.model';
+import { Task, TaskStatus, TaskPriority} from '../../core/models/task.model';
 import { Project } from '../../core/models/project.model';
 import { TaskCardComponent } from '../tasks/task-card/task-card.component';
+import { TaskModalComponent } from '../tasks/task-modal/task-modal.component';
 import { LabelsService } from '../../core/services/labels.service';
 
 interface DashboardStats {
@@ -23,7 +24,7 @@ interface DashboardStats {
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterLink, TaskCardComponent],
+  imports: [CommonModule, RouterLink, TaskCardComponent, TaskModalComponent],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.css'
 })
@@ -46,6 +47,9 @@ export class DashboardComponent implements OnInit {
   projects = signal<Project[]>([]);
   selectedTask = signal<Task | null>(null);
   error = signal<string | null>(null);
+  isModalOpen = signal(false);
+  projectFilter = signal<string>('all');
+
 
   // Computed - Use currentUserSignal from your AuthService
   user = this.authService.currentUserSignal;
@@ -188,10 +192,17 @@ export class DashboardComponent implements OnInit {
 
   openTaskModal(task: Task) {
     this.selectedTask.set(task);
+    this.isModalOpen.set(true);
   }
 
   closeTaskModal() {
+    this.isModalOpen.set(false);
     this.selectedTask.set(null);
+  }
+    onModalOpenChange(open: boolean) {
+    if (!open) {
+      this.closeTaskModal();
+    }
   }
   getProjectForTask(task: Task): { name: string; color: string } | null {
   if (!task.projectId) return null;
