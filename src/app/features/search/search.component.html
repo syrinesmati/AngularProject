@@ -2,8 +2,8 @@
   <div class="max-w-4xl mx-auto">
     <!-- Header -->
     <div class="mb-8">
-      <h1 class="text-3xl font-bold text-foreground mb-2">Search</h1>
-      <p class="text-muted-foreground">Search across all your projects, tasks, and comments</p>
+      <h1 class="text-3xl font-bold text-foreground mb-2">My Workspace</h1>
+      <p class="text-muted-foreground">Browse and search all your projects, tasks, and comments</p>
     </div>
 
     <!-- Search Input -->
@@ -17,7 +17,7 @@
         <input
           type="text"
           [formControl]="searchControl"
-          placeholder="Type to search... (min 2 characters)"
+          placeholder="Filter your content..."
           class="w-full pl-10 pr-4 py-3 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
           autofocus
           aria-label="Search input"
@@ -35,39 +35,41 @@
       </div>
       
       <!-- Results Count -->
-      @if (hasSearched() && !isLoading()) {
+      @if (isSearchActive() && !initialLoading() && !isLoading()) {
       <div class="mt-2 text-sm text-muted-foreground">
-        Found {{ totalResults }} result{{ totalResults !== 1 ? 's' : '' }}
+        @if (isSearchActive()) {
+          <span>Found {{ totalResults }} result{{ totalResults !== 1 ? 's' : '' }}</span>
+        }
       </div>
       }
     </div>
 
     <!-- Loading State -->
-    @if (isLoading()) {
+    @if (initialLoading()) {
     <div class="text-center py-12" role="status" aria-live="polite">
       <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
-      <p class="text-muted-foreground">Searching...</p>
+      <p class="text-muted-foreground">Loading your workspace...</p>
     </div>
     }
 
     <!-- Error State -->
     @else if (error()) {
     <div class="bg-destructive/10 border border-destructive/20 rounded-lg p-6 text-center" role="alert">
-      <lucide-icon name="alert-circle" [size]="48" class="mx-auto text-destructive mb-3"></lucide-icon>
+      <lucide-icon name="alert-triangle" [size]="48" class="mx-auto text-destructive mb-3"></lucide-icon>
       <p class="text-destructive font-medium">{{ error() }}</p>
     </div>
     }
 
-    <!-- Empty State (No search yet) -->
+    <!-- Empty State (No content) -->
     @else if (showEmptyState) {
     <div class="text-center py-16">
-      <lucide-icon name="Search" [size]="64" class="mx-auto text-muted-foreground/30 mb-4"></lucide-icon>
-      <h3 class="text-xl font-semibold text-foreground mb-2">Start Searching</h3>
-      <p class="text-muted-foreground">Enter at least 2 characters to search</p>
+      <lucide-icon name="folder-open" [size]="64" class="mx-auto text-muted-foreground/30 mb-4"></lucide-icon>
+      <h3 class="text-xl font-semibold text-foreground mb-2">No Content Yet</h3>
+      <p class="text-muted-foreground">Create a project to get started</p>
     </div>
     }
 
-    <!-- No Results State -->
+    <!-- No Results State (Search has no matches) -->
     @else if (showNoResults) {
     <div class="text-center py-16">
       <lucide-icon name="file-search" [size]="64" class="mx-auto text-muted-foreground/30 mb-4"></lucide-icon>
@@ -77,17 +79,17 @@
     }
 
     <!-- Results -->
-    @else if (hasResults) {
+    @else {
     <div class="space-y-6">
-      <!-- Projects Results -->
-      @if (projects().length > 0) {
+      <!-- Projects Section -->
+      @if (filteredProjects().length > 0) {
       <div>
         <h2 class="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
           <lucide-icon name="folder-open" [size]="20"></lucide-icon>
-          Projects ({{ projects().length }})
+          Projects <span class="text-sm text-muted-foreground">({{ projectCount }})</span>
         </h2>
         <div class="grid gap-3">
-          @for (project of projects(); track project.id) {
+          @for (project of filteredProjects(); track project.id) {
           <button
             (click)="navigateToProject(project)"
             class="w-full text-left p-4 rounded-lg border border-border bg-card hover:bg-accent transition-colors"
@@ -117,26 +119,37 @@
       </div>
       }
 
-      <!-- Tasks Results -->
-      @if (tasks().length > 0) {
+      <!-- Tasks Section -->
+      @if (filteredTasks().length > 0) {
       <div>
         <h2 class="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
           <lucide-icon name="file-text" [size]="20"></lucide-icon>
-          Tasks ({{ tasks().length }})
+          Tasks <span class="text-sm text-muted-foreground">({{ taskCount }})</span>
         </h2>
         <div class="grid gap-3">
-          @for (task of tasks(); track task.id) {
-          <button
-            (click)="navigateToTask(task)"
-            class="w-full text-left p-4 rounded-lg border border-border bg-card hover:bg-accent transition-colors"
-          >
-            <div class="flex items-start gap-3">
-              <lucide-icon name="check-circle" [size]="20" class="flex-shrink-0 mt-1 text-muted-foreground"></lucide-icon>
-              <div class="flex-1 min-w-0">
-                <h3 class="font-medium text-foreground mb-1">{{ task.title }}</h3>
-                @if (task.description) {
-                <p class="text-sm text-muted-foreground line-clamp-2 mb-2">{{ task.description }}</p>
-                }
+          @for (task of filteredTasks(); track task.id) {
+          @if (isMyTask(task)) {
+            <button
+              (click)="navigateToTask(task)"
+              class="w-full text-left p-4 rounded-lg border border-border bg-card hover:bg-accent transition-colors cursor-pointer"
+            >
+              <div class="flex items-start gap-3">
+                <lucide-icon name="check-circle" [size]="20" class="flex-shrink-0 mt-1 text-muted-foreground"></lucide-icon>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 mb-1">
+                    <h3 class="font-medium text-foreground">{{ task.title }}</h3>
+                    <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-muted text-xs">
+                      <div 
+                        class="w-2 h-2 rounded-full" 
+                        [style.backgroundColor]="getProjectColor(task.projectId)"
+                      ></div>
+                      <span class="text-muted-foreground">{{ getProjectName(task.projectId) }}</span>
+                    </div>
+                  </div>
+                  @if (task.description) {
+                  <p class="text-sm text-muted-foreground line-clamp-2 mb-2">{{ task.description }}</p>
+                  }
+              
                 <div class="flex flex-wrap items-center gap-2">
                   @if (task.status) {
                   <span class="text-xs px-2 py-1 rounded bg-secondary text-secondary-foreground">
@@ -164,21 +177,70 @@
                 </div>
               </div>
             </div>
-          </button>
+            </button>
+          } @else {
+            <div
+              class="w-full text-left p-4 rounded-lg border border-border bg-card opacity-60 cursor-not-allowed"
+            >
+              <div class="flex items-start gap-3">
+                <lucide-icon name="check-circle" [size]="20" class="flex-shrink-0 mt-1 text-muted-foreground"></lucide-icon>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 mb-1">
+                    <h3 class="font-medium text-foreground">{{ task.title }}</h3>
+                    <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-muted text-xs">
+                      <div 
+                        class="w-2 h-2 rounded-full" 
+                        [style.backgroundColor]="getProjectColor(task.projectId)"
+                      ></div>
+                      <span class="text-muted-foreground">{{ getProjectName(task.projectId) }}</span>
+                    </div>
+                  </div>
+                  @if (task.description) {
+                  <p class="text-sm text-muted-foreground line-clamp-2 mb-2">{{ task.description }}</p>
+                  }
+                  <div class="flex flex-wrap items-center gap-2">
+                  @if (task.status) {
+                  <span class="text-xs px-2 py-1 rounded bg-secondary text-secondary-foreground">
+                    {{ task.status }}
+                  </span>
+                  }
+                  @if (task.priority) {
+                  <span 
+                    class="text-xs px-2 py-1 rounded font-medium"
+                    [ngClass]="{
+                      'bg-red-500/10 text-red-600 dark:text-red-400': task.priority === 'HIGH' || task.priority === 'URGENT',
+                      'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400': task.priority === 'MEDIUM',
+                      'bg-blue-500/10 text-blue-600 dark:text-blue-400': task.priority === 'LOW'
+                    }"
+                  >
+                    {{ task.priority }}
+                  </span>
+                  }
+                  @if (task.dueDate) {
+                  <span class="text-xs text-muted-foreground flex items-center gap-1">
+                    <lucide-icon name="calendar" [size]="14"></lucide-icon>
+                    {{ task.dueDate | date: 'MMM d, y' }}
+                  </span>
+                  }
+                </div>
+              </div>
+            </div>
+            </div>
+          }
           }
         </div>
       </div>
       }
 
-      <!-- Comments Results -->
-      @if (comments().length > 0) {
+      <!-- Comments Section -->
+      @if (filteredComments().length > 0) {
       <div>
         <h2 class="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
           <lucide-icon name="message-square" [size]="20"></lucide-icon>
-          Comments ({{ comments().length }})
+          Comments <span class="text-sm text-muted-foreground">({{ commentCount }})</span>
         </h2>
         <div class="grid gap-3">
-          @for (comment of comments(); track comment.id) {
+          @for (comment of filteredComments(); track comment.id) {
           <button
             (click)="navigateToComment(comment)"
             class="w-full text-left p-4 rounded-lg border border-border bg-card hover:bg-accent transition-colors"

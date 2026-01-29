@@ -170,20 +170,20 @@ export class GlobalSearchComponent implements OnInit, OnDestroy {
 
   selectTask(task: Task) {
     this.logger.info('Task selected: ' + task.id);
-    this.router.navigate(['/tasks', task.id]);
+    this.router.navigate(['/tasks']);
     this.closeSearch();
   }
 
   selectProject(project: Project) {
     this.logger.info('Project selected: ' + project.id);
-    this.router.navigate(['/projects', project.id]);
+    this.router.navigate(['/projects']);
     this.closeSearch();
   }
 
   selectComment(comment: Comment) {
     this.logger.info('Comment selected: ' + comment.id);
-    // Navigate to the task containing the comment
-    this.router.navigate(['/tasks', comment.taskId]);
+    // Navigate to tasks page
+    this.router.navigate(['/tasks']);
     this.closeSearch();
   }
 
