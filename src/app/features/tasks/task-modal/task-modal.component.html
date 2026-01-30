@@ -27,7 +27,7 @@
     <form [formGroup]="taskForm" (ngSubmit)="onSubmit($event)" class="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
       <!-- Tabs -->
       <div class="mb-6">
-        <div class="grid grid-cols-3 gap-2 border-b border-border">
+        <div [class]="isEditing ? 'grid grid-cols-3 gap-2 border-b border-border' : 'grid grid-cols-1 gap-2 border-b border-border'">
           <button
             type="button"
             [class.border-b-2]="activeTab === 'details'"
@@ -39,6 +39,7 @@
           >
             Details
           </button>
+          @if (isEditing) {
           <button
             type="button"
             [class.border-b-2]="activeTab === 'comments'"
@@ -61,6 +62,7 @@
           >
             Attachments {{ getAttachmentsCount() > 0 ? '(' + getAttachmentsCount() + ')' : '' }}
           </button>
+          }
         </div>
       </div>
 

@@ -1,10 +1,6 @@
-import { Component, DestroyRef, EventEmitter, Input, OnChanges, OnDestroy, OnInit, Output, SimpleChanges, inject, signal } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, OnChanges, SimpleChanges, ViewChild, ElementRef, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormArray, FormBuilder, FormControl, FormGroup, ReactiveFormsModule, Validators, AbstractControl, ValidationErrors, AsyncValidatorFn } from '@angular/forms';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { debounceTime, distinctUntilChanged, map, catchError } from 'rxjs/operators';
-import { of } from 'rxjs';
-import { FormStateService } from '../../../core/services/form-state.service';
+import { ReactiveFormsModule, FormBuilder, FormGroup, Validators, FormControl } from '@angular/forms';
 
 import { LabelSelectComponent } from '../label-select/label-select.component';
 import { CommentSectionComponent } from '../comment-section/comment-section.component';
@@ -18,6 +14,8 @@ import { AuthService } from '../../../core/services/auth.service';
 import { LucideIconComponent } from '../../../shared/components/lucide-icon/lucide-icon.component';
 import { LabelsService } from '../../../core/services/labels.service';
 import { UsersService } from '../../../core/services/users.service';
+import { CommentsService } from '../../../core/services/comments.service';
+import { AttachmentsService } from '../../../core/services/attachments.service';
 
 @Component({
   selector: 'app-task-modal',
@@ -33,37 +31,40 @@ import { UsersService } from '../../../core/services/users.service';
   templateUrl: './task-modal.component.html',
   styleUrls: ['./task-modal.component.css']
 })
-export class TaskModalComponent implements OnInit, OnDestroy {
+export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
   @Input() task: Task | null = null;
   @Input() open = false;
   @Input() defaultProjectId?: string;
   @Output() openChange = new EventEmitter<boolean>();
   
+  @ViewChild('titleInput') titleInput!: ElementRef<HTMLInputElement>;
+  
   // Expose enums to template
   TaskStatus = TaskStatus;
   TaskPriority = TaskPriority;
+  
+  // Form
+  taskForm!: FormGroup;
+  
+  // Subtasks, comments, attachments (not in reactive form)
+  subtasks: Subtask[] = [];
+  comments: Comment[] = [];
+  attachments: Attachment[] = [];
   
   // Track deleted subtask IDs for backend synchronization
   deletedSubtaskIds: Set<string> = new Set();
   
   activeTab = 'details';
-
-  subtasks: Subtask[] = [];
-  comments: Comment[] = [];
-  attachments: Attachment[] = [];
   
   // Services
   private fb = inject(FormBuilder);
-  private destroyRef = inject(DestroyRef);
   private tasksService = inject(TasksService);
   private projectsService = inject(ProjectsService);
   private authService = inject(AuthService);
   private labelsService = inject(LabelsService);
   private usersService = inject(UsersService);
-  private formState = inject(FormStateService);
-
-  private draftKey = '';
-  private skipPersist = false;
+  private commentsService = inject(CommentsService);
+  private attachmentsService = inject(AttachmentsService);
   
   // Data
   availableProjects: Project[] = [];
@@ -71,80 +72,88 @@ export class TaskModalComponent implements OnInit, OnDestroy {
   assignees: User[] = [];
   currentUser: User | null = null;
   showAssigneeDropdown = signal(false);
-
-  taskForm: FormGroup = this.fb.group(
-    {
-      title: this.fb.control('', {
-        validators: [Validators.required, Validators.maxLength(100)],
-        asyncValidators: [this.uniqueTitleValidator()],
-        nonNullable: true,
-      }),
-      description: this.fb.control('', { nonNullable: true }),
-      status: this.fb.control(TaskStatus.TODO, { nonNullable: true }),
-      priority: this.fb.control(TaskPriority.MEDIUM, { nonNullable: true }),
-      projectId: this.fb.control('', { validators: [Validators.required], nonNullable: true }),
-      startDate: this.fb.control<string | null>(null),
-      dueDate: this.fb.control<string | null>({ value: null, disabled: true }),
-      assigneesIds: this.fb.control<string[]>({ value: [], disabled: true }, { nonNullable: true }),
-      labels: this.fb.control<Label[]>([], { nonNullable: true }),
-      newSubtask: this.fb.control('', { nonNullable: true }),
-    },
-    { validators: [this.dateRangeValidator('startDate', 'dueDate')] }
-  );
   
-  constructor() {}
+  constructor() {
+    this.initForm();
+  }
+  
+  initForm() {
+    this.taskForm = this.fb.group({
+      title: ['', [Validators.required, Validators.maxLength(100)]],
+      description: [''],
+      status: [TaskStatus.TODO],
+      priority: [TaskPriority.MEDIUM],
+      startDate: [null],
+      dueDate: [null],
+      projectId: ['', Validators.required],
+      assigneesIds: [[] as string[]],
+      labels: [[] as Label[]],
+      newSubtask: [''],
+    });
+  }
+  
+  // Form control getters
+  get titleControl() { return this.taskForm.get('title') as FormControl; }
+  get projectIdControl() { return this.taskForm.get('projectId') as FormControl; }
+  get labelsControl() { return this.taskForm.get('labels') as FormControl; }
+  get assigneesIdsControl() { return this.taskForm.get('assigneesIds') as FormControl; }
+  get newSubtaskControl() { return this.taskForm.get('newSubtask') as FormControl; }
+  
+  // Form validation helpers
+  get showTitleError(): boolean {
+    return !!(this.titleControl.invalid && this.titleControl.touched);
+  }
+  
+  get showProjectError(): boolean {
+    return !!(this.projectIdControl.invalid && this.projectIdControl.touched);
+  }
+  
+  get showDateRangeError(): boolean {
+    const startDate = this.taskForm.get('startDate')?.value;
+    const dueDate = this.taskForm.get('dueDate')?.value;
+    return !!(startDate && dueDate && new Date(startDate) > new Date(dueDate));
+  }
+  
+  setActiveTab(tab: string) {
+    this.activeTab = tab;
+  }
+  
+  onLabelsChange(labels: Label[]) {
+    this.labelsControl.setValue(labels);
+  }
+  
+  onCreateLabel(labelData: any) {
+    // Handle label creation
+    this.labelsService.createLabel(labelData).subscribe({
+      next: (newLabel) => {
+        this.availableLabels = [...this.availableLabels, newLabel];
+        const currentLabels = this.labelsControl.value || [];
+        this.labelsControl.setValue([...currentLabels, newLabel]);
+      },
+      error: (error) => {
+        console.error('Failed to create label:', error);
+      }
+    });
+  }
   
   ngOnChanges(changes: SimpleChanges) {
     if (changes['open']?.currentValue && !changes['open'].previousValue) {
-      this.draftKey = this.buildDraftKey();
-      console.log('🔑 Task modal draft key:', this.draftKey, 'isEditing:', this.isEditing);
       this.loadData();
-      // Only use draft for CREATE mode, not EDIT mode
-      if (!this.isEditing && this.hasDraft()) {
-        console.log('🔄 Restoring draft for CREATE mode');
-        this.restoreDraft();
-      } else {
-        console.log('🗑 Resetting form - editing:', this.isEditing, 'hasDraft:', this.hasDraft());
-        this.resetForm();
-      }
+      this.resetForm();
     }
     if (changes['task'] && !changes['task'].firstChange) {
-      this.draftKey = this.buildDraftKey();
-      // Always load from server in EDIT mode, never use drafts
+      // Reset form when a new task is passed in
       this.resetForm();
     }
   }
 
   ngOnInit() {
-    // Only set up subscriptions, NOT data initialization
-    // Data initialization happens in ngOnChanges
-
-    this.startDateControl.valueChanges
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((value) => {
-        this.updateDueDateAvailability(value);
-      });
-
-    this.projectIdControl.valueChanges
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((projectId) => {
-        this.updateAssigneesAvailability(projectId);
-        this.loadAssignees();
-        this.saveDraft();
-      });
-
-    this.taskForm.valueChanges
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => {
-        this.saveDraft();
-      });
+    this.loadData();
+    this.resetForm();
   }
   
   ngOnDestroy() {
-    // Only reset if editing - for create mode, preserve draft
-    if (this.isEditing) {
-      this.resetForm();
-    }
+    this.resetForm();
   }
   
   loadData() {
@@ -155,10 +164,9 @@ export class TaskModalComponent implements OnInit, OnDestroy {
     const projects = this.projectsService.projects();
     if (projects) {
       this.availableProjects = projects;
-      // Only set default project if explicitly provided
-      if (this.defaultProjectId && !this.projectIdControl.value) {
-        this.projectIdControl.setValue(this.defaultProjectId, { emitEvent: false });
-        this.updateAssigneesAvailability(this.defaultProjectId);
+      const currentProjectId = this.projectIdControl.value;
+      if (this.availableProjects.length > 0 && !currentProjectId) {
+        this.projectIdControl.setValue(this.defaultProjectId || this.availableProjects[0].id);
       }
     }
     
@@ -180,6 +188,8 @@ export class TaskModalComponent implements OnInit, OnDestroy {
   }
   
   loadAssignees() {
+    const projectId = this.taskForm.get('projectId')?.value;
+    
     if (this.currentUser?.role === 'ADMIN') {
       // Load all users for admin
       this.usersService.getAllUsers().subscribe({
@@ -187,21 +197,23 @@ export class TaskModalComponent implements OnInit, OnDestroy {
           this.assignees = this.normalizeUsers(users);
         }
       });
-    } else if (this.projectIdControl.value) {
-      const projectId = this.projectIdControl.value;
+    } else if (projectId) {
       // Load assignable users for the project
-      if (!projectId) {
-        return;
-      }
       this.usersService.getAssignableUsers(projectId).subscribe({
         next: (users) => {
           this.assignees = this.normalizeUsers(users);
-          // Don't auto-populate assignees in CREATE mode - let user choose
+          const currentAssignees = this.assigneesIdsControl.value || [];
+          if (this.assignees.length > 0 && currentAssignees.length === 0) {
+            this.assigneesIdsControl.setValue(this.assignees.map(u => u.id));
+          }
         }
       });
     } else {
-      // No project selected - no users available
-      this.assignees = [];
+      // Default to current user
+      if (this.currentUser) {
+        this.assignees = [this.currentUser];
+        this.assigneesIdsControl.setValue([this.currentUser.id]);
+      }
     }
   }
 
@@ -210,69 +222,93 @@ export class TaskModalComponent implements OnInit, OnDestroy {
   }
   
   resetForm() {
-    this.skipPersist = true;
     if (this.task) {
-      this.taskForm.reset(
-        {
-          title: this.task.title,
-          description: this.task.description || '',
-          status: this.task.status,
-          priority: this.task.priority,
-          projectId: this.task.projectId,
-          startDate: null,
-          dueDate: this.task.dueDate ? this.formatDateValue(this.task.dueDate) : null,
-          assigneesIds: this.task.assignees && this.task.assignees.length > 0
-            ? this.task.assignees.map(a => a.id)
-            : (this.currentUser ? [this.currentUser.id] : []),
-          labels: [...(this.task.labels || [])],
-          newSubtask: '',
-        },
-        { emitEvent: false }
-      );
-      this.updateDueDateAvailability(this.startDateControl.value);
-      this.updateAssigneesAvailability(this.projectIdControl.value);
+      this.taskForm.patchValue({
+        title: this.task.title,
+        description: this.task.description || '',
+        status: this.task.status,
+        priority: this.task.priority,
+        startDate: this.task.dueDate ? this.formatDateForInput(new Date(this.task.dueDate)) : null,
+        dueDate: this.task.dueDate ? this.formatDateForInput(new Date(this.task.dueDate)) : null,
+        projectId: this.task.projectId,
+        assigneesIds: this.task.assignees && this.task.assignees.length > 0 
+          ? this.task.assignees.map(a => a.id) 
+          : (this.currentUser ? [this.currentUser.id] : []),
+        labels: [...(this.task.labels || [])],
+        newSubtask: '',
+      });
+      
       this.subtasks = [...(this.task.subtasks || [])];
-      this.comments = [...(this.task.comments || [])];
-      this.attachments = [...(this.task.attachments || [])];
+      
+      // Load comments and attachments from backend
+      if (this.task.id) {
+        this.commentsService.getCommentsByTask(this.task.id).subscribe({
+          next: (comments) => {
+            this.comments = comments;
+          },
+          error: (error) => {
+            console.error('Failed to load comments:', error);
+            this.comments = [];
+          }
+        });
+        
+        this.attachmentsService.getAttachmentsByTask(this.task.id).subscribe({
+          next: (attachments) => {
+            this.attachments = attachments;
+          },
+          error: (error) => {
+            console.error('Failed to load attachments:', error);
+            this.attachments = [];
+          }
+        });
+      } else {
+        this.comments = [];
+        this.attachments = [];
+      }
       
       // Load assignees for this project
       this.loadAssignees();
     } else {
-      this.taskForm.reset(
-        {
-          title: '',
-          description: '',
-          status: TaskStatus.TODO,
-          priority: TaskPriority.MEDIUM,
-          projectId: this.defaultProjectId || '',
-          startDate: null,
-          dueDate: null,
-          assigneesIds: [],
-          labels: [],
-          newSubtask: '',
-        },
-        { emitEvent: false }
-      );
-      this.updateDueDateAvailability(this.startDateControl.value);
-      this.updateAssigneesAvailability(this.projectIdControl.value);
+      this.taskForm.reset({
+        title: '',
+        description: '',
+        status: TaskStatus.TODO,
+        priority: TaskPriority.MEDIUM,
+        startDate: null,
+        dueDate: null,
+        projectId: this.defaultProjectId || '',
+        assigneesIds: this.currentUser ? [this.currentUser.id] : [],
+        labels: [],
+        newSubtask: '',
+      });
+      
       this.subtasks = [];
       this.comments = [];
       this.attachments = [];
     }
+    
     this.activeTab = 'details';
     this.deletedSubtaskIds.clear();
-    this.skipPersist = false;
   }
   
-  formatDateValue(date: Date | null | undefined): string {
-    if (!date) return '';
+  formatDateForInput(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+  
+  onProjectChange() {
+    // When project changes, reload assignees for that project
+    this.loadAssignees();
+  }
+  
+  formatDate(date: Date): string {
     return date.toISOString().split('T')[0];
   }
-
-  private parseDateValue(dateString: string | null | undefined): Date | null {
-    if (!dateString) return null;
-    const parsed = new Date(dateString);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  
+  parseDate(dateString: string): Date {
+    return new Date(dateString);
   }
   
   get isEditing(): boolean {
@@ -287,13 +323,12 @@ export class TaskModalComponent implements OnInit, OnDestroy {
       return;
     }
     
-    // Prepare payloads per backend contract
-    const labelIds = (this.labelsControl.value || []).map(l => l.id).filter(Boolean);
-    const dueDate = this.parseDateValue(this.dueDateControl.value) ?? undefined;
+    const formValue = this.taskForm.value;
+    const labelIds = (formValue.labels || []).map((l: Label) => l.id).filter(Boolean);
 
     if (this.isEditing && this.task) {
       // Prepare subtasks for update, including deleted ones
-      const subtasks = (this.subtasks || []).map((st: Subtask) => ({
+      const subtasks = this.subtasks.map(st => ({
         id: st.id,
         title: st.title,
         isComplete: st.isComplete,
@@ -311,23 +346,22 @@ export class TaskModalComponent implements OnInit, OnDestroy {
       });
 
       const taskData = {
-        status: this.statusControl.value,
+        status: formValue.status,
         subtasks: subtasks.length > 0 ? subtasks : undefined,
         ...(!(
           (this.task?.assignees || []).some(a => a.id === this.currentUser?.id) &&
           this.currentUser?.role === 'USER'
         ) && {
-          title: this.titleControl.value,
-          description: this.descriptionControl.value,
-          priority: this.priorityControl.value,
-          dueDate,
+          title: formValue.title,
+          description: formValue.description,
+          priority: formValue.priority,
+          dueDate: formValue.dueDate ? new Date(formValue.dueDate) : undefined,
           labelIds: labelIds.length > 0 ? labelIds : undefined,
         }),
       };
 
       this.tasksService.updateTask(this.task.id, taskData).subscribe({
         next: () => {
-          this.formState.clear(this.draftKey);
           this.openChange.emit(false);
           this.resetForm();
         },
@@ -337,19 +371,18 @@ export class TaskModalComponent implements OnInit, OnDestroy {
       });
     } else {
       const createPayload = {
-        title: this.titleControl.value,
-        description: this.descriptionControl.value,
-        status: this.statusControl.value,
-        priority: this.priorityControl.value,
-        dueDate,
-        projectId: this.projectIdControl.value,
-        assigneeIds: this.assigneesIdsControl.value,
+        title: formValue.title,
+        description: formValue.description,
+        status: formValue.status,
+        priority: formValue.priority,
+        dueDate: formValue.dueDate ? new Date(formValue.dueDate) : undefined,
+        projectId: formValue.projectId,
+        assigneeIds: formValue.assigneesIds,
         labelIds,
       };
 
       this.tasksService.createTask(createPayload as any).subscribe({
         next: () => {
-          this.formState.clear(this.draftKey);
           this.openChange.emit(false);
           this.resetForm();
         },
@@ -364,7 +397,6 @@ export class TaskModalComponent implements OnInit, OnDestroy {
     if (this.task && confirm('Are you sure you want to delete this task?')) {
       this.tasksService.deleteTask(this.task.id).subscribe({
         next: () => {
-          this.formState.clear(this.draftKey);
           this.openChange.emit(false);
           this.resetForm();
         },
@@ -378,24 +410,21 @@ export class TaskModalComponent implements OnInit, OnDestroy {
   onOpenChange(open: boolean) {
     this.openChange.emit(open);
     if (open) {
-      this.draftKey = this.buildDraftKey();
+      setTimeout(() => {
+        this.titleInput?.nativeElement?.focus();
+      }, 100);
       this.loadData();
-      if (this.hasDraft()) {
-        this.restoreDraft();
-      } else {
-        this.resetForm();
-      }
     } else {
       this.resetForm();
     }
   }
   
   addSubtask() {
-    const value = this.newSubtaskControl.value.trim();
-    if (value) {
+    const newSubtaskValue = this.newSubtaskControl.value?.trim();
+    if (newSubtaskValue) {
       const newSubtask: Subtask = {
         id: 'st-' + Date.now(),
-        title: value,
+        title: newSubtaskValue,
         position: this.subtasks.length,
         isComplete: false,
         taskId: this.task?.id || '',
@@ -405,7 +434,6 @@ export class TaskModalComponent implements OnInit, OnDestroy {
       
       this.subtasks = [...this.subtasks, newSubtask];
       this.newSubtaskControl.setValue('');
-      this.saveDraft();
     }
   }
   
@@ -415,14 +443,12 @@ export class TaskModalComponent implements OnInit, OnDestroy {
       this.deletedSubtaskIds.add(id);
     }
     this.subtasks = this.subtasks.filter(s => s.id !== id);
-    this.saveDraft();
   }
   
   toggleSubtask(id: string) {
     this.subtasks = this.subtasks.map(s =>
       s.id === id ? { ...s, isComplete: !s.isComplete } : s
     );
-    this.saveDraft();
   }
   
   onKeyDown(event: KeyboardEvent) {
@@ -433,36 +459,55 @@ export class TaskModalComponent implements OnInit, OnDestroy {
   }
   
   onAddComment(commentData: { content: string; mentions: string[] }) {
-    const newComment: Comment = {
-      id: 'comment-' + Date.now(),
+    if (!this.task?.id) {
+      console.error('Cannot add comment: task not saved yet');
+      return;
+    }
+
+    this.commentsService.createComment({
+      taskId: this.task.id,
       content: commentData.content,
-      taskId: this.task?.id || '',
-      userId: this.currentUser?.id || '1',
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    this.comments = [...this.comments, newComment];
-    this.saveDraft();
+    }).subscribe({
+      next: (newComment) => {
+        this.comments = [...(this.comments || []), newComment];
+      },
+      error: (error) => {
+        console.error('Failed to create comment:', error);
+      }
+    });
   }
   
   onAddAttachment(attachmentData: { fileName: string; fileUrl: string; mimeType: string; fileSize: number }) {
-    const newAttachment: Attachment = {
-      id: 'attach-' + Date.now(),
+    if (!this.task?.id) {
+      console.error('Cannot add attachment: task not saved yet');
+      return;
+    }
+
+    this.attachmentsService.createAttachment({
+      taskId: this.task.id,
       fileName: attachmentData.fileName,
       fileUrl: attachmentData.fileUrl,
       mimeType: attachmentData.mimeType,
       fileSize: attachmentData.fileSize,
-      taskId: this.task?.id || '',
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    this.attachments = [...this.attachments, newAttachment];
-    this.saveDraft();
+    }).subscribe({
+      next: (newAttachment) => {
+        this.attachments = [...(this.attachments || []), newAttachment];
+      },
+      error: (error) => {
+        console.error('Failed to create attachment:', error);
+      }
+    });
   }
   
   onRemoveAttachment(id: string) {
-    this.attachments = this.attachments.filter(a => a.id !== id);
-    this.saveDraft();
+    this.attachmentsService.deleteAttachment(id).subscribe({
+      next: () => {
+        this.attachments = this.attachments.filter(a => a.id !== id);
+      },
+      error: (error) => {
+        console.error('Failed to delete attachment:', error);
+      }
+    });
   }
   
   getCommentsCount(): number {
@@ -475,22 +520,21 @@ export class TaskModalComponent implements OnInit, OnDestroy {
 
   // Assignee selection helpers
   toggleAssignee(userId: string) {
-    const current = new Set(this.assigneesIdsControl.value);
+    const current = new Set(this.assigneesIdsControl.value || []);
     if (current.has(userId)) {
       current.delete(userId);
     } else {
       current.add(userId);
     }
     this.assigneesIdsControl.setValue(Array.from(current));
-    this.saveDraft();
   }
 
   isAssigneeSelected(userId: string): boolean {
-    return this.assigneesIdsControl.value.includes(userId);
+    return (this.assigneesIdsControl.value || []).includes(userId);
   }
 
   getSelectedAssigneesCount(): number {
-    return this.assigneesIdsControl.value.length;
+    return (this.assigneesIdsControl.value || []).length;
   }
 
   getAssigneeName(userId: string): string {
@@ -499,232 +543,5 @@ export class TaskModalComponent implements OnInit, OnDestroy {
     const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
     return fullName || user.email || 'User';
   }
-
-  onLabelsChange(labels: Label[]) {
-    this.labelsControl.setValue(labels);
-    this.saveDraft();
-  }
-
-  onCreateLabel(payload: { name: string; color: string }) {
-    this.labelsService.createLabel(payload).subscribe({
-      next: (label) => {
-        this.availableLabels = [...this.availableLabels, label];
-        this.labelsControl.setValue([...this.labelsControl.value, label]);
-        this.saveDraft();
-      },
-      error: (err) => console.error('Failed to create label:', err),
-    });
-  }
-
-  onFieldChange() {
-    this.saveDraft();
-  }
-
-  setActiveTab(tab: string): void {
-    this.activeTab = tab;
-    this.saveDraft();
-  }
-
-  private buildDraftKey(): string {
-    const userId = this.authService.getCurrentUser()?.id ?? 'anonymous';
-    const scope = this.isEditing && this.task ? `task-modal:${this.task.id}` : 'task-modal:new';
-    return `draft:${scope}:${userId}`;
-  }
-
-  private hasDraft(): boolean {
-    return !!this.formState.restore(this.draftKey);
-  }
-
-  private restoreDraft(): void {
-    const saved = this.formState.restore<{
-      formData: {
-        title: string;
-        description: string;
-        status: TaskStatus;
-        priority: TaskPriority;
-        startDate: string | null;
-        dueDate: string | null;
-        assigneesIds: string[];
-        projectId: string;
-        labels: Label[];
-        newSubtask: string;
-      };
-      subtasks: Subtask[];
-      comments: Comment[];
-      attachments: Attachment[];
-      activeTab: string;
-      deletedSubtaskIds: string[];
-    }>(this.draftKey);
-
-    console.log('🔍 restoreDraft() called, saved data:', saved);
-
-    if (!saved) {
-      console.log('⚠️ No saved draft found');
-      return;
-    }
-
-    console.log('📋 Restoring form data:', saved.formData);
-    this.skipPersist = true;
-    this.taskForm.patchValue(
-      {
-        title: saved.formData.title,
-        description: saved.formData.description,
-        status: saved.formData.status,
-        priority: saved.formData.priority,
-        projectId: saved.formData.projectId,
-        startDate: saved.formData.startDate ?? null,
-        dueDate: saved.formData.dueDate ?? null,
-        assigneesIds: saved.formData.assigneesIds ?? [],
-        labels: saved.formData.labels ?? [],
-        newSubtask: saved.formData.newSubtask ?? '',
-      },
-      { emitEvent: false }
-    );
-    console.log('✅ Form patched. Current form value:', this.taskForm.getRawValue());
-    this.updateDueDateAvailability(this.startDateControl.value);
-    this.subtasks = saved.subtasks ?? [];
-    this.comments = saved.comments ?? [];
-    this.attachments = saved.attachments ?? [];
-    this.activeTab = saved.activeTab ?? 'details';
-    this.deletedSubtaskIds = new Set(saved.deletedSubtaskIds ?? []);
-    this.skipPersist = false;
-    console.log('✅ Draft restoration complete');
-  }
-
-  private saveDraft(): void {
-    // Only save draft for CREATE mode, not EDIT mode
-    if (this.skipPersist || !this.draftKey || !this.open || this.isEditing) {
-      if (this.isEditing) console.log('🚫 Not saving - in EDIT mode');
-      return;
-    }
-    console.log('💾 Saving task modal draft:', this.draftKey);
-    this.formState.save(this.draftKey, {
-      formData: {
-        ...this.taskForm.getRawValue(),
-      },
-      subtasks: this.subtasks,
-      comments: this.comments,
-      attachments: this.attachments,
-      activeTab: this.activeTab,
-      deletedSubtaskIds: Array.from(this.deletedSubtaskIds),
-    });
-  }
-
-  private updateDueDateAvailability(startDateValue: string | null): void {
-    if (startDateValue) {
-      this.dueDateControl.enable({ emitEvent: false });
-    } else {
-      this.dueDateControl.disable({ emitEvent: false });
-      this.dueDateControl.setValue(null, { emitEvent: false });
-    }
-  }
-
-  private updateAssigneesAvailability(projectId: string): void {
-    if (projectId) {
-      this.assigneesIdsControl.enable({ emitEvent: false });
-    } else {
-      this.assigneesIdsControl.disable({ emitEvent: false });
-      this.assigneesIdsControl.setValue([], { emitEvent: false });
-    }
-  }
-
-  private dateRangeValidator(startKey: string, endKey: string) {
-    return (group: FormGroup) => {
-      const startValue = group.get(startKey)?.value as string | null | undefined;
-      const endValue = group.get(endKey)?.value as string | null | undefined;
-      const startDate = this.parseDateValue(startValue);
-      const endDate = this.parseDateValue(endValue);
-      if (!startDate || !endDate) return null;
-      return startDate.getTime() < endDate.getTime() ? null : { dateRange: true };
-    };
-  }
-
-  get titleControl() {
-    return this.taskForm.get('title') as FormControl<string>;
-  }
-
-  get descriptionControl() {
-    return this.taskForm.get('description') as FormControl<string>;
-  }
-
-  get statusControl() {
-    return this.taskForm.get('status') as FormControl<TaskStatus>;
-  }
-
-  get priorityControl() {
-    return this.taskForm.get('priority') as FormControl<TaskPriority>;
-  }
-
-  get projectIdControl() {
-    return this.taskForm.get('projectId') as FormControl<string>;
-  }
-
-  get startDateControl() {
-    return this.taskForm.get('startDate') as FormControl<string | null>;
-  }
-
-  get dueDateControl() {
-    return this.taskForm.get('dueDate') as FormControl<string | null>;
-  }
-
-  get assigneesIdsControl() {
-    return this.taskForm.get('assigneesIds') as FormControl<string[]>;
-  }
-
-  get labelsControl() {
-    return this.taskForm.get('labels') as FormControl<Label[]>;
-  }
-
-  get newSubtaskControl() {
-    return this.taskForm.get('newSubtask') as FormControl<string>;
-  }
-
-  get showTitleError(): boolean {
-    return this.titleControl.invalid && (this.titleControl.dirty || this.titleControl.touched);
-  }
-
-  get showProjectError(): boolean {
-    return this.projectIdControl.invalid && (this.projectIdControl.dirty || this.projectIdControl.touched);
-  }
-
-  get showDateRangeError(): boolean {
-    const hasError = !!this.taskForm.errors?.['dateRange'];
-    return hasError && (this.startDateControl.touched || this.dueDateControl.touched);
-  }
-
-  /**
-   * Async validator to check if task title is unique
-   * Calls the backend to verify no other task has the same title
-   */
-  private uniqueTitleValidator(): AsyncValidatorFn {
-    return (control: AbstractControl) => {
-      // If no value, skip validation
-      if (!control.value) {
-        return of(null);
-      }
-
-      const title = control.value.trim();
-
-      // If editing, don't validate against own title
-      if (this.isEditing && this.task && this.task.title === title) {
-        return of(null);
-      }
-
-      // Call backend to check if title exists, excluding current task if editing
-      const excludeTaskId = this.isEditing && this.task ? this.task.id : undefined;
-      return this.tasksService.isTitleTaken(title, excludeTaskId).pipe(
-        debounceTime(300),
-        distinctUntilChanged(),
-        map((isTaken: boolean) => {
-          // If title is taken, return validation error
-          return isTaken ? { titleTaken: { value: title } } : null;
-        }),
-        catchError(() => {
-          // If API call fails, allow the submission to proceed
-          console.warn('Failed to validate task title uniqueness');
-          return of(null);
-        })
-      );
-    };
-  }
+  
 }
