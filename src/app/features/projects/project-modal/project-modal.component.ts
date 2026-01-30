@@ -1,6 +1,23 @@
-import { Component, Input, Output, EventEmitter, inject, signal, OnChanges, SimpleChanges, DestroyRef } from '@angular/core';
+import {
+  Component,
+  Input,
+  Output,
+  EventEmitter,
+  inject,
+  signal,
+  OnChanges,
+  SimpleChanges,
+  DestroyRef,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators, AbstractControl, ValidationErrors } from '@angular/forms';
+import {
+  FormBuilder,
+  FormGroup,
+  ReactiveFormsModule,
+  Validators,
+  AbstractControl,
+  ValidationErrors,
+} from '@angular/forms';
 import { forkJoin, of } from 'rxjs';
 import { map, catchError, debounceTime, distinctUntilChanged } from 'rxjs/operators';
 import { Observable } from 'rxjs';
@@ -48,7 +65,7 @@ export class ProjectModalComponent implements OnChanges {
   form: FormGroup;
   isSubmitting = signal(false);
   colors = ['#3B82F6', '#8B5CF6', '#EC4899', '#10B981', '#F97316', '#EF4444', '#06B6D4', '#EAB308'];
-  
+
   // Member selection by role
   availableUsers = signal<User[]>([]);
   selectedOwnerIds = signal<string[]>([]);
@@ -60,7 +77,11 @@ export class ProjectModalComponent implements OnChanges {
 
   constructor() {
     this.form = this.fb.group({
-      name: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(50)], [this.uniqueProjectNameValidator.bind(this)]],
+      name: [
+        '',
+        [Validators.required, Validators.minLength(3), Validators.maxLength(50)],
+        [this.uniqueProjectNameValidator.bind(this)],
+      ],
       description: ['', [Validators.maxLength(500)]],
       color: ['#3B82F6'],
     });
@@ -79,11 +100,14 @@ export class ProjectModalComponent implements OnChanges {
         this.loadUsers();
         // Prefill form when editing
         if (this.isEditing && this.projectToEdit && !this.hasDraft()) {
-          this.form.patchValue({
-            name: this.projectToEdit.name,
-            description: this.projectToEdit.description ?? '',
-            color: this.projectToEdit.color ?? '#3B82F6',
-          }, { emitEvent: false });
+          this.form.patchValue(
+            {
+              name: this.projectToEdit.name,
+              description: this.projectToEdit.description ?? '',
+              color: this.projectToEdit.color ?? '#3B82F6',
+            },
+            { emitEvent: false },
+          );
           this.setSelectionsFromProject(this.projectToEdit);
         }
       }
@@ -104,22 +128,25 @@ export class ProjectModalComponent implements OnChanges {
       // Update draft key when edit mode changes
       const oldDraftKey = this.draftKey;
       this.draftKey = this.buildDraftKey();
-      
+
       // Clear old draft if it's different from new draft (e.g., switching from edit Project ABC to create new)
       if (oldDraftKey && oldDraftKey !== this.draftKey) {
         this.formState.clear(oldDraftKey);
       }
-      
+
       // Restore draft for the new mode
       this.restoreDraft();
-      
+
       // Prefill form when editing and no saved draft exists
       if (this.projectToEdit && !this.hasDraft()) {
-        this.form.patchValue({
-          name: this.projectToEdit.name,
-          description: this.projectToEdit.description ?? '',
-          color: this.projectToEdit.color ?? '#3B82F6',
-        }, { emitEvent: false });
+        this.form.patchValue(
+          {
+            name: this.projectToEdit.name,
+            description: this.projectToEdit.description ?? '',
+            color: this.projectToEdit.color ?? '#3B82F6',
+          },
+          { emitEvent: false },
+        );
         this.setSelectionsFromProject(this.projectToEdit);
       }
     }
@@ -132,26 +159,32 @@ export class ProjectModalComponent implements OnChanges {
   loadUsers() {
     const currentUser = this.authService.currentUserSignal();
     const projectId = this.isEditing && this.projectToEdit ? this.projectToEdit.id : null;
-    
+
     if (currentUser?.role === 'ADMIN') {
-      this.usersService.getAllUsers().subscribe({
-        next: (users) => {
-          this.availableUsers.set(users);
-        },
-        error: (err) => {
-          console.error('Failed to load users:', err);
-        },
-      });
+      this.usersService
+        .getAllUsers()
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: (users) => {
+            this.availableUsers.set(users);
+          },
+          error: (err) => {
+            console.error('Failed to load users:', err);
+          },
+        });
     } else if (projectId) {
       // For non-admins, use getAssignableUsers
-      this.usersService.getAssignableUsers(projectId).subscribe({
-        next: (users) => {
-          this.availableUsers.set(users);
-        },
-        error: (err) => {
-          console.error('Failed to load assignable users:', err);
-        },
-      });
+      this.usersService
+        .getAssignableUsers(projectId)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: (users) => {
+            this.availableUsers.set(users);
+          },
+          error: (err) => {
+            console.error('Failed to load assignable users:', err);
+          },
+        });
     } else {
       // For creating new project as non-admin, only show current user
       if (currentUser) {
@@ -165,7 +198,7 @@ export class ProjectModalComponent implements OnChanges {
   toggleOwner(userId: string) {
     const current = this.selectedOwnerIds();
     if (current.includes(userId)) {
-      this.selectedOwnerIds.set(current.filter(id => id !== userId));
+      this.selectedOwnerIds.set(current.filter((id) => id !== userId));
     } else {
       this.selectedOwnerIds.set([...current, userId]);
     }
@@ -175,7 +208,7 @@ export class ProjectModalComponent implements OnChanges {
   toggleEditor(userId: string) {
     const current = this.selectedEditorIds();
     if (current.includes(userId)) {
-      this.selectedEditorIds.set(current.filter(id => id !== userId));
+      this.selectedEditorIds.set(current.filter((id) => id !== userId));
     } else {
       this.selectedEditorIds.set([...current, userId]);
     }
@@ -185,7 +218,7 @@ export class ProjectModalComponent implements OnChanges {
   toggleViewer(userId: string) {
     const current = this.selectedViewerIds();
     if (current.includes(userId)) {
-      this.selectedViewerIds.set(current.filter(id => id !== userId));
+      this.selectedViewerIds.set(current.filter((id) => id !== userId));
     } else {
       this.selectedViewerIds.set([...current, userId]);
     }
@@ -207,9 +240,7 @@ export class ProjectModalComponent implements OnChanges {
   private setSelectionsFromProject(project: Project) {
     this.skipPersist = true;
     const members = project.members ?? [];
-    const ownerIds = members
-      .filter((m) => m.role === ProjectMemberRole.OWNER)
-      .map((m) => m.userId);
+    const ownerIds = members.filter((m) => m.role === ProjectMemberRole.OWNER).map((m) => m.userId);
     const editorIds = members
       .filter((m) => m.role === ProjectMemberRole.EDITOR)
       .map((m) => m.userId);
@@ -337,11 +368,10 @@ export class ProjectModalComponent implements OnChanges {
       const memberOps = this.buildMemberOperations(projectId, desiredRoles);
 
       // Check if project fields changed
-      const projectFieldsChanged = (
+      const projectFieldsChanged =
         (this.projectToEdit.name ?? '') !== (updatePayload.name ?? '') ||
         (this.projectToEdit.description ?? '') !== (updatePayload.description ?? '') ||
-        (this.projectToEdit.color ?? '') !== (updatePayload.color ?? '')
-      );
+        (this.projectToEdit.color ?? '') !== (updatePayload.color ?? '');
 
       const runMemberOperations = () => {
         if (memberOps.length === 0) {
@@ -352,76 +382,92 @@ export class ProjectModalComponent implements OnChanges {
 
       if (projectFieldsChanged) {
         // Update project and then members
-        this.projectsService.updateProject(projectId, updatePayload).subscribe({
-          next: (updatedProject) => {
-            runMemberOperations().subscribe({
-              next: () => {
-                // Reload members and emit updated project
-                  this.projectsService.getProjectById(projectId).subscribe({
-                    next: (projectWithMembers) => {
-                      this.projectUpdated.emit(projectWithMembers);
-                      this.onClose();
-                    },
-                    error: (err: any) => {
-                      console.warn('Project updated but failed to reload members:', err);
-                      this.projectUpdated.emit(updatedProject);
-                      this.onClose();
-                    },
-                  });
-              },
-              error: (err: any) => {
-                console.error('Failed to sync members:', err);
-                this.isSubmitting.set(false);
-              },
-            });
-          },
-          error: (err) => {
-            console.error('Failed to update project:', err);
-            this.isSubmitting.set(false);
-          },
-        });
+        this.projectsService
+          .updateProject(projectId, updatePayload)
+          .pipe(takeUntilDestroyed(this.destroyRef))
+          .subscribe({
+            next: (updatedProject) => {
+              runMemberOperations()
+                .pipe(takeUntilDestroyed(this.destroyRef))
+                .subscribe({
+                  next: () => {
+                    // Reload members and emit updated project
+                    this.projectsService
+                      .getProjectById(projectId)
+                      .pipe(takeUntilDestroyed(this.destroyRef))
+                      .subscribe({
+                        next: (projectWithMembers) => {
+                          this.projectUpdated.emit(projectWithMembers);
+                          this.onClose();
+                        },
+                        error: (err: any) => {
+                          console.warn('Project updated but failed to reload members:', err);
+                          this.projectUpdated.emit(updatedProject);
+                          this.onClose();
+                        },
+                      });
+                  },
+                  error: (err: any) => {
+                    console.error('Failed to sync members:', err);
+                    this.isSubmitting.set(false);
+                  },
+                });
+            },
+            error: (err) => {
+              console.error('Failed to update project:', err);
+              this.isSubmitting.set(false);
+            },
+          });
       } else {
         // Only update members
-        runMemberOperations().subscribe({
-          next: () => {
-            // Reload the project with updated members
-            this.projectsService.getProjectById(projectId).subscribe({
-              next: (updatedProject) => {
-                this.projectUpdated.emit(updatedProject);
-                this.onClose();
-              },
-              error: (err) => {
-                console.error('Failed to reload project:', err);
-                this.isSubmitting.set(false);
-              },
-            });
-          },
-          error: (err: any) => {
-            console.error('Failed to sync members:', err);
-            this.isSubmitting.set(false);
-          },
-        });
+        runMemberOperations()
+          .pipe(takeUntilDestroyed(this.destroyRef))
+          .subscribe({
+            next: () => {
+              // Reload the project with updated members
+              this.projectsService
+                .getProjectById(projectId)
+                .pipe(takeUntilDestroyed(this.destroyRef))
+                .subscribe({
+                  next: (updatedProject) => {
+                    this.projectUpdated.emit(updatedProject);
+                    this.onClose();
+                  },
+                  error: (err) => {
+                    console.error('Failed to reload project:', err);
+                    this.isSubmitting.set(false);
+                  },
+                });
+            },
+            error: (err: any) => {
+              console.error('Failed to sync members:', err);
+              this.isSubmitting.set(false);
+            },
+          });
       }
     } else {
       // Create new project
-      const payload = { 
-        ...formValue, 
-        ownerId, 
-        editors, 
-        viewers 
+      const payload = {
+        ...formValue,
+        ownerId,
+        editors,
+        viewers,
       };
 
-      this.projectsService.createProject(payload).subscribe({
-        next: (newProject) => {
-          this.projectCreated.emit(newProject);
-          this.formState.clear(this.draftKey);
-          this.onClose();
-        },
-        error: (err) => {
-          console.error('Failed to create project:', err);
-          this.isSubmitting.set(false);
-        },
-      });
+      this.projectsService
+        .createProject(payload)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: (newProject) => {
+            this.projectCreated.emit(newProject);
+            this.formState.clear(this.draftKey);
+            this.onClose();
+          },
+          error: (err) => {
+            console.error('Failed to create project:', err);
+            this.isSubmitting.set(false);
+          },
+        });
     }
   }
 
@@ -432,7 +478,10 @@ export class ProjectModalComponent implements OnChanges {
 
   private buildDraftKey(): string {
     const userId = this.authService.getCurrentUser()?.id ?? 'anonymous';
-    const scope = this.isEditing && this.projectToEdit ? `project-modal:${this.projectToEdit.id}` : 'project-modal:new';
+    const scope =
+      this.isEditing && this.projectToEdit
+        ? `project-modal:${this.projectToEdit.id}`
+        : 'project-modal:new';
     return `draft:${scope}:${userId}`;
   }
 
@@ -471,7 +520,9 @@ export class ProjectModalComponent implements OnChanges {
    * Async validator to check if project name is unique
    * Calls the backend to verify no other project has the same name
    */
-  private uniqueProjectNameValidator(control: AbstractControl): Observable<ValidationErrors | null> {
+  private uniqueProjectNameValidator(
+    control: AbstractControl,
+  ): Observable<ValidationErrors | null> {
     // If no value, skip validation
     if (!control.value) {
       return of(null);
@@ -485,7 +536,8 @@ export class ProjectModalComponent implements OnChanges {
     }
 
     // Call backend to check if name exists, excluding current project if editing
-    const excludeProjectId = this.isEditing && this.projectToEdit ? this.projectToEdit.id : undefined;
+    const excludeProjectId =
+      this.isEditing && this.projectToEdit ? this.projectToEdit.id : undefined;
     return this.projectsService.checkProjectNameExists(projectName, excludeProjectId).pipe(
       debounceTime(300),
       distinctUntilChanged(),
@@ -497,7 +549,7 @@ export class ProjectModalComponent implements OnChanges {
         // If API call fails, allow the submission to proceed
         console.warn('Failed to validate project name uniqueness');
         return of(null);
-      })
+      }),
     );
   }
 }

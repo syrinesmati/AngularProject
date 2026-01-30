@@ -1,4 +1,4 @@
-import { Component, DestroyRef, inject, signal } from '@angular/core';
+import { Component, effect, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { AuthService } from '../../../core/services/auth.service';
@@ -6,7 +6,7 @@ import { UsersService } from '../../../core/services/users.service';
 import { ProfileUpdateDto } from '../models/settings.model';
 import { User } from '../../../core/models/user.model';
 import { FormStateService } from '../../../core/services/form-state.service';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { toSignal } from '@angular/core/rxjs-interop';
 
 @Component({
   selector: 'app-profile',
@@ -20,7 +20,6 @@ export class ProfileComponent {
   private authService = inject(AuthService);
   private usersService = inject(UsersService);
   private formState = inject(FormStateService);
-  private destroyRef = inject(DestroyRef);
 
   private draftKey = '';
 
@@ -31,16 +30,19 @@ export class ProfileComponent {
   errorMessage = signal<string>('');
   selectedFile: File | null = null;
   previewAvatar = signal<string | null>(null);
+  private formChanges = signal<any>(null);
 
   constructor() {
     this.profileForm = this.fb.group({
       firstName: ['', [Validators.required]],
       lastName: ['', [Validators.required]],
-      email: [{value: '', disabled: true}], // Email is read-only
+      email: [{ value: '', disabled: true }], // Email is read-only
     });
 
     this.draftKey = this.buildDraftKey('settings-profile');
-    const saved = this.formState.restore<{ firstName: string; lastName: string; email: string }>(this.draftKey);
+    const saved = this.formState.restore<{ firstName: string; lastName: string; email: string }>(
+      this.draftKey,
+    );
     if (saved) {
       this.profileForm.patchValue(saved, { emitEvent: false });
     } else {
@@ -48,9 +50,15 @@ export class ProfileComponent {
       this.loadUserData();
     }
 
-    this.profileForm.valueChanges
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => this.formState.save(this.draftKey, this.profileForm.getRawValue()));
+    // Convert form valueChanges to signal
+    toSignal(this.profileForm.valueChanges, { initialValue: null });
+
+    // React to form changes with effect
+    effect(() => {
+      if (this.profileForm.dirty) {
+        this.formState.save(this.draftKey, this.profileForm.getRawValue());
+      }
+    });
   }
 
   private loadUserData() {
@@ -75,7 +83,7 @@ export class ProfileComponent {
     if (input.files && input.files[0]) {
       this.selectedFile = input.files[0];
       // Create immediate preview
-      this.convertFileToBase64(this.selectedFile).then(base64 => {
+      this.convertFileToBase64(this.selectedFile).then((base64) => {
         this.previewAvatar.set(base64);
       });
     }
@@ -111,7 +119,8 @@ export class ProfileComponent {
       this.formState.clear(this.draftKey);
     } catch (error: any) {
       console.error('Error updating profile:', error);
-      const errorMessage = error?.error?.message || error?.message || 'Failed to update profile. Please try again.';
+      const errorMessage =
+        error?.error?.message || error?.message || 'Failed to update profile. Please try again.';
       this.errorMessage.set(errorMessage);
     } finally {
       this.isSubmitting.set(false);

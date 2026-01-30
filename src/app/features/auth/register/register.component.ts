@@ -42,7 +42,11 @@ export class RegisterComponent {
 
       // Validate email on blur (includes async unique-email)
       email: this.fb.control('', {
-        validators: [Validators.required, Validators.email, noSpacesValidator({ allowInternal: false })],
+        validators: [
+          Validators.required,
+          Validators.email,
+          noSpacesValidator({ allowInternal: false }),
+        ],
         asyncValidators: [this.uniqueEmailValidator.validate()],
         updateOn: 'blur',
       }),
@@ -59,14 +63,24 @@ export class RegisterComponent {
         updateOn: 'blur',
       }),
     },
-    { validators: matchPasswordValidator('password', 'confirmPassword') }
+    { validators: matchPasswordValidator('password', 'confirmPassword') },
   );
 
-  get firstName() { return this.registerForm.get('firstName')!; }
-  get lastName() { return this.registerForm.get('lastName')!; }
-  get email() { return this.registerForm.get('email')!; }
-  get password() { return this.registerForm.get('password')!; }
-  get confirmPassword() { return this.registerForm.get('confirmPassword')!; }
+  get firstName() {
+    return this.registerForm.get('firstName')!;
+  }
+  get lastName() {
+    return this.registerForm.get('lastName')!;
+  }
+  get email() {
+    return this.registerForm.get('email')!;
+  }
+  get password() {
+    return this.registerForm.get('password')!;
+  }
+  get confirmPassword() {
+    return this.registerForm.get('confirmPassword')!;
+  }
 
   constructor() {
     const saved = this.formState.restore<{
@@ -104,16 +118,19 @@ export class RegisterComponent {
         email: email!,
         password: password!,
       };
-      this.authService.register(registerDto).subscribe({
-        next: () => {
-          this.formState.clear(this.draftKey);
-          this.router.navigate(['/dashboard']);
-        },
-        error: (error) => {
-          this.errorMessage.set(error.message);
-          this.isSubmitting.set(false);
-        },
-      });
+      this.authService
+        .register(registerDto)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: () => {
+            this.formState.clear(this.draftKey);
+            this.router.navigate(['/dashboard']);
+          },
+          error: (error) => {
+            this.errorMessage.set(error.message);
+            this.isSubmitting.set(false);
+          },
+        });
     } else {
       // Avoid forcing blur-only validators to show errors on submit
       // this.registerForm.markAllAsTouched();

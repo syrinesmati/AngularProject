@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, DestroyRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   CdkDragDrop,
@@ -7,6 +7,7 @@ import {
   transferArrayItem,
 } from '@angular/cdk/drag-drop';
 import { FormsModule } from '@angular/forms';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { TasksService } from '../../core/services/task.service';
 import { ProjectsService } from '../../core/services/projects.service';
 import { AuthService } from '../../core/services/auth.service';
@@ -28,6 +29,7 @@ export class BoardComponent implements OnInit {
   private tasksService = inject(TasksService);
   private projectsService = inject(ProjectsService);
   private authService = inject(AuthService);
+  private destroyRef = inject(DestroyRef);
 
   // Board columns configuration
   readonly columns = BOARD_COLUMNS;
@@ -117,23 +119,26 @@ export class BoardComponent implements OnInit {
   }
 
   private updateTaskStatus(task: Task, newStatus: TaskStatus) {
-    this.tasksService.updateTask(task.id, { status: newStatus }).subscribe({
-      next: (updatedTask) => {
-        // Update the task in the local array
-        const tasks = this.myTasks();
-        const index = tasks.findIndex((t) => t.id === task.id);
-        if (index !== -1) {
-          tasks[index] = { ...tasks[index], status: newStatus };
-          this.myTasks.set([...tasks]);
-        }
-        console.log(`Task "${task.title}" moved to ${this.getColumnTitle(newStatus)}`);
-        // Optionally show a toast notification
-      },
-      error: (error) => {
-        console.error('Failed to update task status:', error);
-        // Optionally show error notification
-      },
-    });
+    this.tasksService
+      .updateTask(task.id, { status: newStatus })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updatedTask) => {
+          // Update the task in the local array
+          const tasks = this.myTasks();
+          const index = tasks.findIndex((t) => t.id === task.id);
+          if (index !== -1) {
+            tasks[index] = { ...tasks[index], status: newStatus };
+            this.myTasks.set([...tasks]);
+          }
+          console.log(`Task "${task.title}" moved to ${this.getColumnTitle(newStatus)}`);
+          // Optionally show a toast notification
+        },
+        error: (error) => {
+          console.error('Failed to update task status:', error);
+          // Optionally show error notification
+        },
+      });
   }
 
   private getColumnTitle(status: TaskStatus): string {
@@ -179,7 +184,7 @@ export class BoardComponent implements OnInit {
       ? this.tasksService.getAllTasks()
       : this.tasksService.getMyTasks();
 
-    taskRequest.subscribe({
+    taskRequest.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (tasks) => {
         this.myTasks.set(tasks);
         this.isLoading.set(false);

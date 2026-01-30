@@ -1,12 +1,13 @@
 // header.component.ts - Add hasAvatar() helper and error handling
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 import { GlobalSearchComponent } from '../global-search/global-search.component';
 import { NotificationsDropdownComponent } from '../notifications-dropdown/notifications-dropdown.component';
 import { LucideIconComponent } from '../../shared/components/lucide-icon/lucide-icon.component';
-import { BreadcrumbComponent } from "../breadcrumb/breadcrumb.component";
+import { BreadcrumbComponent } from '../breadcrumb/breadcrumb.component';
 
 @Component({
   selector: 'app-header',
@@ -16,14 +17,15 @@ import { BreadcrumbComponent } from "../breadcrumb/breadcrumb.component";
     GlobalSearchComponent,
     NotificationsDropdownComponent,
     LucideIconComponent,
-    BreadcrumbComponent
-],
+    BreadcrumbComponent,
+  ],
   templateUrl: './header.component.html',
   styleUrls: ['./header.component.css'],
 })
 export class HeaderComponent {
   private authService = inject(AuthService);
   private router = inject(Router);
+  private destroyRef = inject(DestroyRef);
 
   currentUser = this.authService.currentUserSignal;
   showUserDropdown = false;
@@ -72,7 +74,7 @@ export class HeaderComponent {
   }
 
   logout() {
-    this.authService.logout().subscribe();
+    this.authService.logout().pipe(takeUntilDestroyed(this.destroyRef)).subscribe();
     this.showUserDropdown = false;
   }
 }

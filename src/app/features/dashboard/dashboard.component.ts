@@ -1,5 +1,6 @@
 // features/dashboard/dashboard.component.ts
-import { Component, OnInit, signal, computed, inject } from '@angular/core';
+import { Component, OnInit, signal, computed, inject, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { forkJoin, of } from 'rxjs';
@@ -8,7 +9,7 @@ import { map, catchError } from 'rxjs/operators';
 import { AuthService } from '../../core/services/auth.service';
 import { TasksService } from '../../core/services/task.service';
 import { ProjectsService } from '../../core/services/projects.service';
-import { Task, TaskStatus, TaskPriority} from '../../core/models/task.model';
+import { Task, TaskStatus, TaskPriority } from '../../core/models/task.model';
 import { Project } from '../../core/models/project.model';
 import { TaskCardComponent } from '../tasks/task-card/task-card.component';
 import { TaskModalComponent } from '../tasks/task-modal/task-modal.component';
@@ -26,13 +27,14 @@ interface DashboardStats {
   standalone: true,
   imports: [CommonModule, RouterLink, TaskCardComponent, TaskModalComponent],
   templateUrl: './dashboard.component.html',
-  styleUrl: './dashboard.component.css'
+  styleUrl: './dashboard.component.css',
 })
 export class DashboardComponent implements OnInit {
   private authService = inject(AuthService);
   private tasksService = inject(TasksService);
   private projectsService = inject(ProjectsService);
   private labelsService = inject(LabelsService);
+  private destroyRef = inject(DestroyRef);
 
   // Signals
   isLoading = signal(true);
@@ -40,7 +42,7 @@ export class DashboardComponent implements OnInit {
     todoCount: 0,
     inProgressCount: 0,
     doneCount: 0,
-    overdueCount: 0
+    overdueCount: 0,
   });
   recentTasks = signal<Task[]>([]);
   highPriorityTasks = signal<Task[]>([]);
@@ -49,7 +51,6 @@ export class DashboardComponent implements OnInit {
   error = signal<string | null>(null);
   isModalOpen = signal(false);
   projectFilter = signal<string>('all');
-
 
   // Computed - Use currentUserSignal from your AuthService
   user = this.authService.currentUserSignal;
@@ -69,74 +70,77 @@ export class DashboardComponent implements OnInit {
 
     // Use forkJoin to load all data in parallel
     forkJoin({
-      
-    projects: this.projectsService.loadProjects().pipe(
-      catchError(error => {
-        console.error('Error loading projects:', error);
-        return of([] as Project[]);
-      })
-    ),
+      projects: this.projectsService.loadProjects().pipe(
+        catchError((error) => {
+          console.error('Error loading projects:', error);
+          return of([] as Project[]);
+        }),
+      ),
       tasks: this.tasksService.getMyTasks().pipe(
-        catchError(error => {
+        catchError((error) => {
           console.error('Error loading tasks:', error);
           // Return empty tasks array
           return of([] as Task[]);
-        })
+        }),
+      ),
+    })
+      .pipe(
+        map(({ projects, tasks }) => {
+          const filteredProjects = Array.isArray(projects)
+            ? projects.filter((p) => !p.isArchived)
+            : [];
+
+          // Calculate stats
+          const stats = this.calculateStats(tasks);
+
+          // Get recent tasks (last 5 updated)
+          const recent = [...tasks]
+            .sort(
+              (a, b) =>
+                new Date(b.updatedAt || b.createdAt || 0).getTime() -
+                new Date(a.updatedAt || a.createdAt || 0).getTime(),
+            )
+            .slice(0, 5);
+
+          // Get high priority incomplete tasks
+          const highPriority = tasks
+            .filter((t) => {
+              const isHighPriority =
+                t.priority === TaskPriority.HIGH || t.priority === TaskPriority.URGENT;
+              const isNotDone = t.status !== TaskStatus.DONE;
+              return isHighPriority && isNotDone;
+            })
+            .slice(0, 3);
+
+          return { stats, recent, highPriority, projects: filteredProjects };
+        }),
+        catchError((error) => {
+          console.error('Dashboard load error:', error);
+          this.error.set('Failed to load dashboard data');
+          return of({
+            stats: { todoCount: 0, inProgressCount: 0, doneCount: 0, overdueCount: 0 },
+            recent: [],
+            highPriority: [],
+            projects: [],
+          });
+        }),
       )
-    }).pipe(
-      map(({ projects, tasks }) => {
-
-        const filteredProjects = Array.isArray(projects)
-          ? projects.filter(p => !p.isArchived)
-          : [];
-
-        // Calculate stats
-        const stats = this.calculateStats(tasks);
-        
-        // Get recent tasks (last 5 updated)
-        const recent = [...tasks]
-          .sort((a, b) => 
-            new Date(b.updatedAt || b.createdAt || 0).getTime() - 
-            new Date(a.updatedAt || a.createdAt || 0).getTime()
-          )
-          .slice(0, 5);
-        
-        // Get high priority incomplete tasks
-        const highPriority = tasks
-          .filter(t => {
-            const isHighPriority = t.priority === TaskPriority.HIGH || t.priority === TaskPriority.URGENT;
-            const isNotDone = t.status !== TaskStatus.DONE;
-            return isHighPriority && isNotDone;
-          })
-          .slice(0, 3);
-
-        return { stats, recent, highPriority, projects: filteredProjects };
-      }),
-      catchError(error => {
-        console.error('Dashboard load error:', error);
-        this.error.set('Failed to load dashboard data');
-        return of({
-          stats: { todoCount: 0, inProgressCount: 0, doneCount: 0, overdueCount: 0 },
-          recent: [],
-          highPriority: [],
-          projects: []
-        });
-      })
-    ).subscribe({
-      next: (data) => {
-        console.log('Dashboard data loaded:', data);
-        this.stats.set(data.stats);
-        this.recentTasks.set(data.recent);
-        this.highPriorityTasks.set(data.highPriority);
-        this.projects.set(data.projects);
-        this.isLoading.set(false);
-      },
-      error: (error) => {
-        console.error('Subscription error:', error);
-        this.error.set('An unexpected error occurred');
-        this.isLoading.set(false);
-      }
-    });
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (data) => {
+          console.log('Dashboard data loaded:', data);
+          this.stats.set(data.stats);
+          this.recentTasks.set(data.recent);
+          this.highPriorityTasks.set(data.highPriority);
+          this.projects.set(data.projects);
+          this.isLoading.set(false);
+        },
+        error: (error) => {
+          console.error('Subscription error:', error);
+          this.error.set('An unexpected error occurred');
+          this.isLoading.set(false);
+        },
+      });
   }
 
   private calculateStats(tasks: Task[]): DashboardStats {
@@ -146,14 +150,14 @@ export class DashboardComponent implements OnInit {
 
     const now = new Date();
     now.setHours(0, 0, 0, 0);
-    
+
     return {
-      todoCount: tasks.filter(t => t.status === TaskStatus.TODO).length,
-      inProgressCount: tasks.filter(t => t.status === TaskStatus.IN_PROGRESS).length,
-      doneCount: tasks.filter(t => t.status === TaskStatus.DONE).length,
-      overdueCount: tasks.filter(t => {
+      todoCount: tasks.filter((t) => t.status === TaskStatus.TODO).length,
+      inProgressCount: tasks.filter((t) => t.status === TaskStatus.IN_PROGRESS).length,
+      doneCount: tasks.filter((t) => t.status === TaskStatus.DONE).length,
+      overdueCount: tasks.filter((t) => {
         if (t.status === TaskStatus.DONE || !t.dueDate) return false;
-        
+
         try {
           const dueDate = new Date(t.dueDate);
           dueDate.setHours(0, 0, 0, 0);
@@ -161,7 +165,7 @@ export class DashboardComponent implements OnInit {
         } catch {
           return false;
         }
-      }).length
+      }).length,
     };
   }
 
@@ -170,7 +174,7 @@ export class DashboardComponent implements OnInit {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       date.setHours(0, 0, 0, 0);
-      
+
       return date.getTime() === today.getTime();
     } catch {
       return false;
@@ -180,18 +184,16 @@ export class DashboardComponent implements OnInit {
   getProjectTaskCount(projectId: string): number {
     // Count tasks from recent and high priority lists
     const allTasks = [...this.recentTasks(), ...this.highPriorityTasks()];
-    
+
     // Use a Set to avoid counting duplicates
     const uniqueTasks = new Map();
-    allTasks.forEach(task => {
+    allTasks.forEach((task) => {
       if (!uniqueTasks.has(task.id)) {
         uniqueTasks.set(task.id, task);
       }
     });
-    
-    return Array.from(uniqueTasks.values())
-      .filter(task => task.projectId === projectId)
-      .length;
+
+    return Array.from(uniqueTasks.values()).filter((task) => task.projectId === projectId).length;
   }
 
   openTaskModal(task: Task) {
@@ -203,18 +205,18 @@ export class DashboardComponent implements OnInit {
     this.isModalOpen.set(false);
     this.selectedTask.set(null);
   }
-    onModalOpenChange(open: boolean) {
+  onModalOpenChange(open: boolean) {
     if (!open) {
       this.closeTaskModal();
     }
   }
   getProjectForTask(task: Task): { name: string; color: string } | null {
-  if (!task.projectId) return null;
-  const project = this.projects().find(p => p.id === task.projectId);
-  if (!project) return null;
-  return {
-    name: project.name,
-    color: project.color? project.color : '#000000'
-  };
-}
+    if (!task.projectId) return null;
+    const project = this.projects().find((p) => p.id === task.projectId);
+    if (!project) return null;
+    return {
+      name: project.name,
+      color: project.color ? project.color : '#000000',
+    };
+  }
 }

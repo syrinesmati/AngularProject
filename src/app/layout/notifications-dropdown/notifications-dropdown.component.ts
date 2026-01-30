@@ -1,7 +1,10 @@
-import { Component, signal, inject, computed, effect, OnInit } from '@angular/core';
+import { Component, signal, inject, computed, effect, OnInit, DestroyRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { formatDistanceToNow } from 'date-fns';
+import { interval } from 'rxjs';
+import { switchMap } from 'rxjs/operators';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideIconComponent } from '../../shared/components/lucide-icon/lucide-icon.component';
 import { NotificationsService } from '../../core/services/notifications.service';
 import { Notification, NotificationType } from '../../core/models/notification.model';
@@ -15,6 +18,7 @@ import { Notification, NotificationType } from '../../core/models/notification.m
 })
 export class NotificationsDropdownComponent implements OnInit {
   public notificationsService = inject(NotificationsService);
+  private destroyRef = inject(DestroyRef);
 
   // UI state
   showDropdown = signal(false);
@@ -40,16 +44,19 @@ export class NotificationsDropdownComponent implements OnInit {
 
   private startPolling() {
     // Poll for unread count updates every 30 seconds
-    setInterval(() => {
-      this.notificationsService.loadUnreadCount().subscribe({
+    interval(30000)
+      .pipe(
+        switchMap(() => this.notificationsService.loadUnreadCount()),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
         next: () => {
           // Unread count updated
         },
         error: (error) => {
           console.error('Failed to poll unread count:', error);
-        }
+        },
       });
-    }, 30000); // 30 seconds
   }
 
   toggleDropdown() {
@@ -57,58 +64,69 @@ export class NotificationsDropdownComponent implements OnInit {
       const newValue = !v;
       // When opening the dropdown, load latest notifications
       if (newValue) {
-        this.notificationsService.loadNotifications().subscribe({
-          next: () => {
-            // Notifications loaded
-          },
-          error: (error) => {
-            console.error('Failed to load notifications when opening dropdown:', error);
-          }
-        });
+        this.notificationsService
+          .loadNotifications()
+          .pipe(takeUntilDestroyed(this.destroyRef))
+          .subscribe({
+            next: () => {
+              // Notifications loaded
+            },
+            error: (error) => {
+              console.error('Failed to load notifications when opening dropdown:', error);
+            },
+          });
       }
       return newValue;
     });
   }
 
-
   markAsRead(notificationId: string) {
     console.log('Marking notification as read:', notificationId);
-    const notification = this.notifications().find(n => n.id === notificationId);
+    const notification = this.notifications().find((n) => n.id === notificationId);
     console.log('Notification before:', notification);
 
-    this.notificationsService.markAsReadWithSignal(notificationId).subscribe({
-      next: (updatedNotification) => {
-        console.log('Notification marked as read successfully:', updatedNotification);
-        console.log('Unread count after:', this.unreadCount());
-        this.playNotificationSound();
-      },
-      error: (error) => {
-        console.error('Failed to mark notification as read:', error);
-      }
-    });
+    this.notificationsService
+      .markAsReadWithSignal(notificationId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updatedNotification) => {
+          console.log('Notification marked as read successfully:', updatedNotification);
+          console.log('Unread count after:', this.unreadCount());
+          this.playNotificationSound();
+        },
+        error: (error) => {
+          console.error('Failed to mark notification as read:', error);
+        },
+      });
   }
 
   markAllAsRead() {
-    this.notificationsService.markAllAsReadWithSignal().subscribe({
-      next: () => {
-        // All notifications marked as read
-        this.playNotificationSound();
-      },
-      error: (error) => {
-        console.error('Failed to mark all notifications as read:', error);
-      }
-    });
+    this.notificationsService
+      .markAllAsReadWithSignal()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          // All notifications marked as read
+          this.playNotificationSound();
+        },
+        error: (error) => {
+          console.error('Failed to mark all notifications as read:', error);
+        },
+      });
   }
 
   deleteNotification(notificationId: string) {
-    this.notificationsService.deleteNotificationWithSignal(notificationId).subscribe({
-      next: () => {
-        // Notification deleted
-      },
-      error: (error) => {
-        console.error('Failed to delete notification:', error);
-      }
-    });
+    this.notificationsService
+      .deleteNotificationWithSignal(notificationId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          // Notification deleted
+        },
+        error: (error) => {
+          console.error('Failed to delete notification:', error);
+        },
+      });
   }
 
   setTypeFilter(type: string | null) {
@@ -197,7 +215,9 @@ export class NotificationsDropdownComponent implements OnInit {
     if (!notificationId || !this.swipeElement) return;
 
     const transform = this.swipeElement.style.transform;
-    const offset = transform ? parseFloat(transform.replace('translateX(', '').replace('px)', '')) : 0;
+    const offset = transform
+      ? parseFloat(transform.replace('translateX(', '').replace('px)', ''))
+      : 0;
 
     // Reset transform
     this.swipeElement.style.transform = '';

@@ -1,6 +1,7 @@
-import { Component, OnInit, signal, computed, inject } from '@angular/core';
+import { Component, OnInit, signal, computed, inject, DestroyRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { TasksService, FilterTaskDto } from '../../../core/services/task.service';
 import { ProjectsService } from '../../../core/services/projects.service';
@@ -19,18 +20,18 @@ type SortField = 'title' | 'priority' | 'dueDate' | 'status';
 type SortOrder = 'asc' | 'desc';
 type ViewMode = 'grid' | 'table';
 
-const priorityOrder: Record<TaskPriority, number> = { 
+const priorityOrder: Record<TaskPriority, number> = {
   URGENT: 4,
-  HIGH: 3, 
-  MEDIUM: 2, 
-  LOW: 1 
+  HIGH: 3,
+  MEDIUM: 2,
+  LOW: 1,
 };
 
-const statusOrder: Record<TaskStatus, number> = { 
-  TODO: 1, 
+const statusOrder: Record<TaskStatus, number> = {
+  TODO: 1,
   IN_PROGRESS: 2,
   IN_REVIEW: 3,
-  DONE: 4 
+  DONE: 4,
 };
 
 @Component({
@@ -43,30 +44,31 @@ const statusOrder: Record<TaskStatus, number> = {
     TaskModalComponent,
     EmptyStateComponent,
     StatusBadgeComponent,
-    PriorityBadgeComponent
+    PriorityBadgeComponent,
   ],
   templateUrl: './tasks.component.html',
-  styleUrl: './tasks.component.css'
+  styleUrl: './tasks.component.css',
 })
 export class TasksComponent implements OnInit {
   private tasksService = inject(TasksService);
   private projectsService = inject(ProjectsService);
   private labelsService = inject(LabelsService);
   private authService = inject(AuthService);
+  private destroyRef = inject(DestroyRef);
 
   // State signals
   isLoading = signal(true);
   tasks = signal<Task[]>([]);
   selectedTask = signal<Task | null>(null);
   isModalOpen = signal(false);
-  
+
   // Filter signals
   searchQuery = signal('');
   statusFilter = signal<TaskStatus | 'all'>('all');
   priorityFilter = signal<TaskPriority | 'all'>('all');
   projectFilter = signal<string>('all');
   labelFilter = signal<string>('all');
-  
+
   // Sorting & view
   sortField = signal<SortField>('dueDate');
   sortOrder = signal<SortOrder>('asc');
@@ -85,38 +87,37 @@ export class TasksComponent implements OnInit {
     // Search filter
     const query = this.searchQuery().toLowerCase();
     if (query) {
-      result = result.filter(task =>
-        task.title.toLowerCase().includes(query) ||
-        task.description?.toLowerCase().includes(query)
+      result = result.filter(
+        (task) =>
+          task.title.toLowerCase().includes(query) ||
+          task.description?.toLowerCase().includes(query),
       );
     }
 
     // Status filter
     if (this.statusFilter() !== 'all') {
-      result = result.filter(task => task.status === this.statusFilter());
+      result = result.filter((task) => task.status === this.statusFilter());
     }
 
     // Priority filter
     if (this.priorityFilter() !== 'all') {
-      result = result.filter(task => task.priority === this.priorityFilter());
+      result = result.filter((task) => task.priority === this.priorityFilter());
     }
 
     // Project filter
     if (this.projectFilter() !== 'all') {
-      result = result.filter(task => task.projectId === this.projectFilter());
+      result = result.filter((task) => task.projectId === this.projectFilter());
     }
 
     // Label filter
     if (this.labelFilter() !== 'all') {
-      result = result.filter(task => 
-        task.labels?.some(l => l.id === this.labelFilter())
-      );
+      result = result.filter((task) => task.labels?.some((l) => l.id === this.labelFilter()));
     }
 
     // Sort
     result.sort((a, b) => {
       let comparison = 0;
-      
+
       switch (this.sortField()) {
         case 'title':
           comparison = a.title.localeCompare(b.title);
@@ -133,7 +134,7 @@ export class TasksComponent implements OnInit {
           comparison = dateA - dateB;
           break;
       }
-      
+
       return this.sortOrder() === 'asc' ? comparison : -comparison;
     });
 
@@ -141,11 +142,13 @@ export class TasksComponent implements OnInit {
   });
 
   hasFilters = computed(() => {
-    return this.searchQuery() !== '' ||
-           this.statusFilter() !== 'all' ||
-           this.priorityFilter() !== 'all' ||
-           this.projectFilter() !== 'all' ||
-           this.labelFilter() !== 'all';
+    return (
+      this.searchQuery() !== '' ||
+      this.statusFilter() !== 'all' ||
+      this.priorityFilter() !== 'all' ||
+      this.projectFilter() !== 'all' ||
+      this.labelFilter() !== 'all'
+    );
   });
 
   ngOnInit() {
@@ -155,11 +158,11 @@ export class TasksComponent implements OnInit {
   private loadData() {
     this.isLoading.set(true);
 
-    // Load projects
-    this.projectsService.loadProjects().subscribe();
+    // Load projects (service updates its own signal)
+    this.projectsService.loadProjects().pipe(takeUntilDestroyed(this.destroyRef)).subscribe();
 
-    // Load labels
-    this.labelsService.getAllLabels().subscribe();
+    // Load labels (service updates its own signal)
+    this.labelsService.getAllLabels().pipe(takeUntilDestroyed(this.destroyRef)).subscribe();
 
     // Load tasks
     this.loadTasks();
@@ -184,27 +187,33 @@ export class TasksComponent implements OnInit {
 
     // Load tasks based on project filter
     if (this.projectFilter() !== 'all') {
-      this.tasksService.getTasksByProject(this.projectFilter(), filters).subscribe({
-        next: (response) => {
-          this.tasks.set(response.data);
-          this.isLoading.set(false);
-        },
-        error: (error) => {
-          console.error('Failed to load tasks:', error);
-          this.isLoading.set(false);
-        }
-      });
+      this.tasksService
+        .getTasksByProject(this.projectFilter(), filters)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: (response) => {
+            this.tasks.set(response.data);
+            this.isLoading.set(false);
+          },
+          error: (error) => {
+            console.error('Failed to load tasks:', error);
+            this.isLoading.set(false);
+          },
+        });
     } else {
-      this.tasksService.getMyTasks(filters).subscribe({
-        next: (response) => {
-          this.tasks.set(response);
-          this.isLoading.set(false);
-        },
-        error: (error) => {
-          console.error('Failed to load tasks:', error);
-          this.isLoading.set(false);
-        }
-      });
+      this.tasksService
+        .getMyTasks(filters)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: (response) => {
+            this.tasks.set(response);
+            this.isLoading.set(false);
+          },
+          error: (error) => {
+            console.error('Failed to load tasks:', error);
+            this.isLoading.set(false);
+          },
+        });
     }
   }
 
@@ -281,8 +290,10 @@ export class TasksComponent implements OnInit {
 
   // Helper method to get project details
   getProjectById(projectId: string): { name: string; color: string } | null {
-    const project = this.availableProjects()?.find(p => p.id === projectId);
-    return project ? { name: project.name, color: project.color ? project.color : '#000000' } : null;
+    const project = this.availableProjects()?.find((p) => p.id === projectId);
+    return project
+      ? { name: project.name, color: project.color ? project.color : '#000000' }
+      : null;
   }
 
   // Helper for assignee display

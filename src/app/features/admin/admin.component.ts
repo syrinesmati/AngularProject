@@ -1,6 +1,7 @@
-import { Component, OnInit, inject, computed, signal } from '@angular/core';
+import { Component, OnInit, inject, computed, signal, DestroyRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '../../core/services/auth.service';
 import { UsersService } from '../../core/services/users.service';
 import { User } from '../../core/models/user.model';
@@ -10,12 +11,13 @@ import { User } from '../../core/models/user.model';
   standalone: true,
   imports: [CommonModule],
   templateUrl: './admin.component.html',
-  styleUrls: ['./admin.component.css']
+  styleUrls: ['./admin.component.css'],
 })
 export class AdminComponent implements OnInit {
   private authService = inject(AuthService);
   private usersService = inject(UsersService);
   private router = inject(Router);
+  private destroyRef = inject(DestroyRef);
 
   // Signals for reactive state
   users = signal<User[]>([]);
@@ -28,12 +30,8 @@ export class AdminComponent implements OnInit {
 
   // Computed stats
   totalUsers = computed(() => this.users().length);
-  activeUsers = computed(() => 
-    this.users().filter(u => u.isActive !== false).length
-  );
-  administrators = computed(() => 
-    this.users().filter(u => u.role === 'ADMIN').length
-  );
+  activeUsers = computed(() => this.users().filter((u) => u.isActive !== false).length);
+  administrators = computed(() => this.users().filter((u) => u.role === 'ADMIN').length);
 
   ngOnInit(): void {
     // Check if user is admin
@@ -50,18 +48,21 @@ export class AdminComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
 
-    this.usersService.getAllUsers().subscribe({
-      next: (users) => {
-        console.log('Loaded users:', users);
-        this.users.set(users);
-        this.loading.set(false);
-      },
-      error: (err) => {
-        console.error('Error loading users:', err);
-        this.error.set('Failed to load users. Please try again.');
-        this.loading.set(false);
-      }
-    });
+    this.usersService
+      .getAllUsers()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (users) => {
+          console.log('Loaded users:', users);
+          this.users.set(users);
+          this.loading.set(false);
+        },
+        error: (err) => {
+          console.error('Error loading users:', err);
+          this.error.set('Failed to load users. Please try again.');
+          this.loading.set(false);
+        },
+      });
   }
 
   getInitials(user: User): string {
@@ -113,21 +114,24 @@ export class AdminComponent implements OnInit {
 
     // Optimistically remove from UI
     const originalUsers = this.users();
-    this.users.update(users => users.filter(u => u.id !== user.id));
+    this.users.update((users) => users.filter((u) => u.id !== user.id));
 
-    this.usersService.deleteUser(user.id).subscribe({
-      next: () => {
-        console.log('User deleted successfully:', user.id);
-        // Clear cache to ensure fresh data on next load
-        this.usersService.clearCache();
-      },
-      error: (err) => {
-        console.error('Error deleting user:', err);
-        // Restore the original list on error
-        this.users.set(originalUsers);
-        alert('Failed to delete user. Please try again.');
-      }
-    });
+    this.usersService
+      .deleteUser(user.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          console.log('User deleted successfully:', user.id);
+          // Clear cache to ensure fresh data on next load
+          this.usersService.clearCache();
+        },
+        error: (err) => {
+          console.error('Error deleting user:', err);
+          // Restore the original list on error
+          this.users.set(originalUsers);
+          alert('Failed to delete user. Please try again.');
+        },
+      });
   }
 
   isDeletable(user: User): boolean {
