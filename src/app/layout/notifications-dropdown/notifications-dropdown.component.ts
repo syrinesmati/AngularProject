@@ -1,4 +1,13 @@
-import { Component, signal, inject, computed, effect, OnInit, DestroyRef } from '@angular/core';
+import {
+  Component,
+  signal,
+  inject,
+  computed,
+  effect,
+  OnInit,
+  DestroyRef,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { formatDistanceToNow } from 'date-fns';
@@ -15,6 +24,7 @@ import { Notification, NotificationType } from '../../core/models/notification.m
   imports: [CommonModule, RouterLink, LucideIconComponent],
   templateUrl: './notifications-dropdown.component.html',
   styleUrls: ['./notifications-dropdown.component.css'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class NotificationsDropdownComponent implements OnInit {
   public notificationsService = inject(NotificationsService);

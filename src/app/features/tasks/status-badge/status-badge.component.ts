@@ -1,4 +1,4 @@
-import { Component, input, computed } from '@angular/core';
+import { Component, input, computed, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { TaskStatus } from '../../../core/models/task.model';
 
@@ -7,29 +7,30 @@ import { TaskStatus } from '../../../core/models/task.model';
   imports: [CommonModule],
   templateUrl: './status-badge.component.html',
   styleUrl: './status-badge.component.css',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class StatusBadgeComponent {
   status = input.required<TaskStatus>();
-  
+
   private statusConfig: Record<TaskStatus, { label: string; class: string }> = {
     [TaskStatus.TODO]: {
       label: 'To Do',
-      class: 'bg-status-todo-bg text-status-todo'
+      class: 'bg-status-todo-bg text-status-todo',
     },
     [TaskStatus.IN_PROGRESS]: {
       label: 'In Progress',
-      class: 'bg-status-in-progress-bg text-status-in-progress'
+      class: 'bg-status-in-progress-bg text-status-in-progress',
     },
     [TaskStatus.IN_REVIEW]: {
       label: 'In Review',
-      class: 'bg-yellow-100 text-yellow-800'
+      class: 'bg-yellow-100 text-yellow-800',
     },
     [TaskStatus.DONE]: {
       label: 'Done',
-      class: 'bg-status-done-bg text-status-done'
+      class: 'bg-status-done-bg text-status-done',
     },
   };
-  
+
   config = computed(() => this.statusConfig[this.status()]);
   badgeClasses = computed(() => this.config().class);
 }

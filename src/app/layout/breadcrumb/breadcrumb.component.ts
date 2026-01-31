@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { NavigationService } from '../../core/services/navigation.service';
 
@@ -20,6 +20,7 @@ import { NavigationService } from '../../core/services/navigation.service';
   imports: [CommonModule],
   templateUrl: './breadcrumb.component.html',
   styleUrl: './breadcrumb.component.css',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class BreadcrumbComponent {
   navigationService = inject(NavigationService);

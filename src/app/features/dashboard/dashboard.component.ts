@@ -1,5 +1,13 @@
 // features/dashboard/dashboard.component.ts
-import { Component, OnInit, signal, computed, inject, DestroyRef } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  signal,
+  computed,
+  inject,
+  DestroyRef,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
@@ -28,6 +36,7 @@ interface DashboardStats {
   imports: [CommonModule, RouterLink, TaskCardComponent, TaskModalComponent],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.css',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class DashboardComponent implements OnInit {
   private authService = inject(AuthService);

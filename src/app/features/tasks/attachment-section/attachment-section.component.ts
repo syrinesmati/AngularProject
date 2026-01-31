@@ -1,4 +1,12 @@
-import { Component, input, output, signal, ViewChild, ElementRef } from '@angular/core';
+import {
+  Component,
+  input,
+  output,
+  signal,
+  ViewChild,
+  ElementRef,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Attachment } from '../../../core/models/task.model';
 
@@ -8,6 +16,7 @@ import { Attachment } from '../../../core/models/task.model';
   imports: [CommonModule],
   templateUrl: './attachment-section.component.html',
   styleUrl: './attachment-section.component.css',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AttachmentSectionComponent {
   attachments = input.required<Attachment[]>();

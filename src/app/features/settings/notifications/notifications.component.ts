@@ -1,4 +1,4 @@
-import { Component, signal } from '@angular/core';
+import { Component, signal, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 @Component({
@@ -7,6 +7,7 @@ import { CommonModule } from '@angular/common';
   imports: [CommonModule],
   templateUrl: './notifications.component.html',
   styleUrls: ['./notifications.component.css'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class NotificationsComponent {
   emailNotifications = signal(true);

@@ -1,4 +1,12 @@
-import { Component, OnInit, signal, computed, inject, DestroyRef } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  signal,
+  computed,
+  inject,
+  DestroyRef,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -48,6 +56,7 @@ const statusOrder: Record<TaskStatus, number> = {
   ],
   templateUrl: './tasks.component.html',
   styleUrl: './tasks.component.css',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class TasksComponent implements OnInit {
   private tasksService = inject(TasksService);
@@ -150,6 +159,25 @@ export class TasksComponent implements OnInit {
       this.labelFilter() !== 'all'
     );
   });
+
+  // Extract plural task count label
+  taskCountLabel = computed(() => {
+    const count = this.filteredAndSortedTasks().length;
+    return `${count} task${count !== 1 ? 's' : ''}`;
+  });
+
+  // Extract view mode button classes
+  viewGridButtonClass = computed(() =>
+    this.viewMode() === 'grid'
+      ? 'h-8 w-8 rounded bg-secondary flex items-center justify-center'
+      : 'h-8 w-8 rounded hover:bg-accent flex items-center justify-center transition-colors',
+  );
+
+  viewTableButtonClass = computed(() =>
+    this.viewMode() === 'table'
+      ? 'h-8 w-8 rounded bg-secondary flex items-center justify-center'
+      : 'h-8 w-8 rounded hover:bg-accent flex items-center justify-center transition-colors',
+  );
 
   ngOnInit() {
     this.loadData();

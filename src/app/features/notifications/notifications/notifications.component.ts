@@ -6,6 +6,7 @@ import {
   OnInit,
   ChangeDetectorRef,
   DestroyRef,
+  ChangeDetectionStrategy,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
@@ -23,6 +24,7 @@ type ReadFilter = 'all' | 'read' | 'unread';
   imports: [CommonModule, LucideIconComponent],
   templateUrl: './notifications.component.html',
   styleUrls: ['./notifications.component.css'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class NotificationsComponent implements OnInit {
   public notificationsService = inject(NotificationsService);

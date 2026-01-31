@@ -1,4 +1,4 @@
-import { Component, Input } from '@angular/core';
+import { Component, Input, ChangeDetectionStrategy } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
 
 @Component({
@@ -12,6 +12,7 @@ import { LucideAngularModule } from 'lucide-angular';
     [strokeWidth]="strokeWidth"
     [class]="class"
   ></lucide-angular>`,
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class LucideIconComponent {
   @Input() name: string = 'Circle';

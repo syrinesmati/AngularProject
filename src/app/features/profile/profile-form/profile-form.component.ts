@@ -1,5 +1,5 @@
 // profile-form.component.ts - CORRECTED with better error handling and logging
-import { Component, DestroyRef, inject, signal } from '@angular/core';
+import { Component, DestroyRef, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   ReactiveFormsModule,
@@ -18,6 +18,7 @@ import { AuthService } from '../../../core/services/auth.service';
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule],
   templateUrl: './profile-form.component.html',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProfileFormComponent {
   private fb = inject(FormBuilder);

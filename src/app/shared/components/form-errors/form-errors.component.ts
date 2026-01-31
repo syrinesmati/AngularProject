@@ -1,19 +1,19 @@
-import { Component, Input } from '@angular/core';
+import { Component, Input, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { AbstractControl } from '@angular/forms';
 
 /**
  * REUSABLE FORM ERROR DISPLAY COMPONENT
- * 
+ *
  * Displays validation errors for a form control with proper styling.
  * Supports all built-in validators + custom validators.
- * 
+ *
  * Usage:
  * ```html
  * <input formControlName="email" />
  * <app-form-errors [control]="email" [fieldName]="'Email'"></app-form-errors>
  * ```
- * 
+ *
  * Features:
  * - Only shows errors after field is touched
  * - Supports custom error messages
@@ -25,22 +25,20 @@ import { AbstractControl } from '@angular/forms';
   selector: 'app-form-errors',
   standalone: true,
   imports: [CommonModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div *ngIf="shouldShowErrors()" class="mt-1 text-sm text-red-600">
       <!-- Required -->
-      <p *ngIf="control?.hasError('required')">
-        {{ fieldName }} is required
-      </p>
+      <p *ngIf="control?.hasError('required')">{{ fieldName }} is required</p>
 
       <!-- Email -->
-      <p *ngIf="control?.hasError('email')">
-        Please enter a valid email address
-      </p>
+      <p *ngIf="control?.hasError('email')">Please enter a valid email address</p>
 
       <!-- Min Length -->
       <p *ngIf="control?.hasError('minlength')">
-        {{ fieldName }} must be at least {{ control?.errors?.['minlength'].requiredLength }} characters
-        (current: {{ control?.errors?.['minlength'].actualLength }})
+        {{ fieldName }} must be at least
+        {{ control?.errors?.['minlength'].requiredLength }} characters (current:
+        {{ control?.errors?.['minlength'].actualLength }})
       </p>
 
       <!-- Max Length -->
@@ -61,9 +59,7 @@ import { AbstractControl } from '@angular/forms';
           <li *ngIf="control?.errors?.['passwordStrength'].requireLowercase">
             At least one lowercase letter
           </li>
-          <li *ngIf="control?.errors?.['passwordStrength'].requireNumber">
-            At least one number
-          </li>
+          <li *ngIf="control?.errors?.['passwordStrength'].requireNumber">At least one number</li>
           <li *ngIf="control?.errors?.['passwordStrength'].requireSpecialChar">
             At least one special character (!@#$%^&*)
           </li>
@@ -71,14 +67,10 @@ import { AbstractControl } from '@angular/forms';
       </div>
 
       <!-- Password Mismatch -->
-      <p *ngIf="control?.hasError('passwordMismatch')">
-        Passwords do not match
-      </p>
+      <p *ngIf="control?.hasError('passwordMismatch')">Passwords do not match</p>
 
       <!-- Email Taken (Async Validator) -->
-      <p *ngIf="control?.hasError('emailTaken')">
-        This email is already registered
-      </p>
+      <p *ngIf="control?.hasError('emailTaken')">This email is already registered</p>
 
       <!-- Leading/Trailing Spaces -->
       <p *ngIf="control?.hasError('leadingOrTrailingSpaces')">
@@ -86,9 +78,7 @@ import { AbstractControl } from '@angular/forms';
       </p>
 
       <!-- Contains Spaces -->
-      <p *ngIf="control?.hasError('containsSpaces')">
-        {{ fieldName }} cannot contain spaces
-      </p>
+      <p *ngIf="control?.hasError('containsSpaces')">{{ fieldName }} cannot contain spaces</p>
 
       <!-- Past Date -->
       <p *ngIf="control?.hasError('pastDate')">
@@ -101,9 +91,7 @@ import { AbstractControl } from '@angular/forms';
       </p>
 
       <!-- Pattern -->
-      <p *ngIf="control?.hasError('pattern')">
-        Invalid format for {{ fieldName }}
-      </p>
+      <p *ngIf="control?.hasError('pattern')">Invalid format for {{ fieldName }}</p>
 
       <!-- Custom Error Message (if provided) -->
       <p *ngIf="customErrorMessage">
@@ -114,19 +102,37 @@ import { AbstractControl } from '@angular/forms';
     <!-- Async Validator Pending State -->
     <div *ngIf="control?.pending" class="mt-1 text-sm text-blue-600">
       <span class="inline-flex items-center">
-        <svg class="animate-spin h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        <svg
+          class="animate-spin h-4 w-4 mr-1"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+        >
+          <circle
+            class="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            stroke-width="4"
+          ></circle>
+          <path
+            class="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+          ></path>
         </svg>
         Checking...
       </span>
     </div>
   `,
-  styles: [`
-    :host {
-      display: block;
-    }
-  `]
+  styles: [
+    `
+      :host {
+        display: block;
+      }
+    `,
+  ],
 })
 export class FormErrorsComponent {
   @Input() control: AbstractControl | null = null;
@@ -140,6 +146,6 @@ export class FormErrorsComponent {
    * 3. Control has been touched OR form was submitted
    */
   shouldShowErrors(): boolean {
-  return !!(this.control && this.control.invalid && this.control.touched);
-    }
+    return !!(this.control && this.control.invalid && this.control.touched);
+  }
 }

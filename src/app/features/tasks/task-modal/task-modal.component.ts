@@ -10,6 +10,7 @@ import {
   SimpleChanges,
   inject,
   signal,
+  ChangeDetectionStrategy,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
@@ -62,6 +63,7 @@ import { UsersService } from '../../../core/services/users.service';
   ],
   templateUrl: './task-modal.component.html',
   styleUrls: ['./task-modal.component.css'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class TaskModalComponent implements OnInit, OnDestroy {
   @Input() task: Task | null = null;
