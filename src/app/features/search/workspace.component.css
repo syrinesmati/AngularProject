@@ -1,0 +1,6 @@
+/* Workspace Component Styles */
+
+/* Ensure scrolling works properly */
+:host {
+  display: block;
+}

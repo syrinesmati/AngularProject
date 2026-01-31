@@ -107,13 +107,13 @@ export const routes: Routes = [
       },
 
       // ============================================
-      // SEARCH
+      // SEARCH / WORKSPACE
       // ============================================
       {
         path: 'search',
         loadComponent: () =>
-          import('./features/search/search.component').then((m) => m.SearchComponent),
-        data: { title: 'Search' },
+          import('./features/search/workspace.component').then((m) => m.WorkspaceComponent),
+        data: { title: 'My Workspace' },
       },
 
       // ============================================
