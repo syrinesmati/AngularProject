@@ -1,4 +1,13 @@
-import { Component, input, output, signal, ViewChild, ElementRef, effect } from '@angular/core';
+import {
+  Component,
+  input,
+  output,
+  signal,
+  ViewChild,
+  ElementRef,
+  effect,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Comment } from '../../../core/models/task.model';
@@ -11,6 +20,7 @@ import { formatDistanceToNow } from 'date-fns';
   imports: [CommonModule, FormsModule],
   templateUrl: './comment-section.component.html',
   styleUrl: './comment-section.component.css',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CommentSectionComponent {
   comments = input.required<Comment[]>();

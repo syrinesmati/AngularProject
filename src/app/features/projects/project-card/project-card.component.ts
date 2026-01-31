@@ -1,4 +1,11 @@
-import { Component, Input, Output, EventEmitter, inject } from '@angular/core';
+import {
+  Component,
+  Input,
+  Output,
+  EventEmitter,
+  inject,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ProjectsService } from '../../../core/services/projects.service';
 import { Project, ProjectMember } from '../../../core/models/project.model';
@@ -9,6 +16,7 @@ import { Project, ProjectMember } from '../../../core/models/project.model';
   imports: [CommonModule],
   templateUrl: './project-card.component.html',
   styleUrl: './project-card.component.css',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProjectCardComponent {
   @Input() project!: Project;
@@ -53,7 +61,7 @@ export class ProjectCardComponent {
 
   getMemberInitials(member: ProjectMember): string {
     const u = member.user as any;
-    
+
     if (!u) {
       // Check if user data is directly on the member object
       const firstName = (member as any).firstName || '';
@@ -64,30 +72,30 @@ export class ProjectCardComponent {
       }
       return 'U';
     }
-    
+
     const first = (u.firstName || '').trim();
     const last = (u.lastName || '').trim();
-    
+
     // Build initials from first and last name
     if (first && last) {
       return `${first.charAt(0)}${last.charAt(0)}`.toUpperCase();
     }
-    
+
     // If only first name
     if (first) {
       return first.charAt(0).toUpperCase();
     }
-    
+
     // If only last name
     if (last) {
       return last.charAt(0).toUpperCase();
     }
-    
+
     // Fallback to email
     if (u.email) {
       return String(u.email).charAt(0).toUpperCase();
     }
-    
+
     return 'U';
   }
 

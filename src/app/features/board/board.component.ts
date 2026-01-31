@@ -1,4 +1,12 @@
-import { Component, inject, signal, computed, OnInit, DestroyRef } from '@angular/core';
+import {
+  Component,
+  inject,
+  signal,
+  computed,
+  OnInit,
+  DestroyRef,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   CdkDragDrop,
@@ -23,6 +31,7 @@ import { TaskCardComponent } from '../tasks/task-card/task-card.component';
   imports: [CommonModule, DragDropModule, FormsModule, TaskCardComponent],
   templateUrl: './board.component.html',
   styleUrl: './board.component.css',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class BoardComponent implements OnInit {
   // Inject services

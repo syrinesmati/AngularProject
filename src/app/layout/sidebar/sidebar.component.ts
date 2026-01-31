@@ -1,4 +1,12 @@
-import { Component, signal, Output, EventEmitter, inject, computed } from '@angular/core';
+import {
+  Component,
+  signal,
+  Output,
+  EventEmitter,
+  inject,
+  computed,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
@@ -19,6 +27,7 @@ interface NavItem {
   imports: [CommonModule, RouterLink, RouterLinkActive, LucideIconComponent],
   templateUrl: './sidebar.component.html',
   styleUrls: ['./sidebar.component.css'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SidebarComponent {
   private authService = inject(AuthService);
@@ -44,7 +53,7 @@ export class SidebarComponent {
         path: '/notifications',
         label: 'Notifications',
         icon: 'Bell',
-        badge: this.notificationsService.unreadCountSignal()
+        badge: this.notificationsService.unreadCountSignal(),
       },
       { path: '/settings', label: 'Settings', icon: 'Settings' },
     ];

@@ -1,4 +1,12 @@
-import { Component, OnInit, signal, computed, inject, DestroyRef } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  signal,
+  computed,
+  inject,
+  DestroyRef,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -48,6 +56,7 @@ const statusOrder: Record<TaskStatus, number> = {
   ],
   templateUrl: './tasks.component.html',
   styleUrl: './tasks.component.css',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class TasksComponent implements OnInit {
   private tasksService = inject(TasksService);

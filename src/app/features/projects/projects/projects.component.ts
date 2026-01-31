@@ -1,4 +1,13 @@
-import { Component, inject, signal, computed, effect, untracked, DestroyRef } from '@angular/core';
+import {
+  Component,
+  inject,
+  signal,
+  computed,
+  effect,
+  untracked,
+  DestroyRef,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { forkJoin, of } from 'rxjs';
@@ -18,6 +27,7 @@ import { TasksService } from '../../../core/services/task.service';
   imports: [CommonModule, FormsModule, ProjectCardComponent, ProjectModalComponent],
   templateUrl: './projects.component.html',
   styleUrls: ['./projects.component.css'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProjectsComponent {
   private projectsService = inject(ProjectsService);
@@ -81,6 +91,11 @@ export class ProjectsComponent {
     return `${count} project${count !== 1 ? 's' : ''}`;
   });
 
+  // Memoize admin role check to avoid repeated calls
+  isCurrentUserAdmin = computed(() => this.currentUser()?.role === UserRole.ADMIN);
+
+  // Memoize empty state creation button visibility
+  showCreateInEmptyState = computed(() => !this.searchQuery() && this.isCurrentUserAdmin());
   constructor() {
     // Load projects when the current user is available.
     // Use untracked() to avoid re-running due to service cache updates.

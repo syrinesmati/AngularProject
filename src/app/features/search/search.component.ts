@@ -28,8 +28,8 @@ import { Comment } from '../../core/models/task.model';
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, LucideIconComponent],
   templateUrl: './search.component.html',
-  styleUrls: ['./search.component.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  styleUrls: ['./search.component.css'],
 })
 export class SearchComponent implements OnInit {
   private router = inject(Router);

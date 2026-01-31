@@ -8,6 +8,7 @@ import {
   OnChanges,
   SimpleChanges,
   DestroyRef,
+  ChangeDetectionStrategy,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
@@ -44,6 +45,7 @@ interface ProjectFormDto {
   imports: [CommonModule, ReactiveFormsModule],
   templateUrl: './project-modal.component.html',
   styleUrl: './project-modal.component.css',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProjectModalComponent implements OnChanges {
   @Input() isOpen = false;

@@ -1,4 +1,12 @@
-import { Component, OnInit, inject, computed, signal, DestroyRef } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  inject,
+  computed,
+  signal,
+  DestroyRef,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -12,6 +20,7 @@ import { User } from '../../core/models/user.model';
   imports: [CommonModule],
   templateUrl: './admin.component.html',
   styleUrls: ['./admin.component.css'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AdminComponent implements OnInit {
   private authService = inject(AuthService);

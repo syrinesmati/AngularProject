@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { SettingsService } from '../../../core/services/settings.service';
 
@@ -8,6 +8,7 @@ import { SettingsService } from '../../../core/services/settings.service';
   imports: [CommonModule],
   templateUrl: './preferences.component.html',
   styleUrls: ['./preferences.component.css'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class PreferencesComponent {
   private settingsService = inject(SettingsService);
