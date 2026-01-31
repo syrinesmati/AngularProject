@@ -61,6 +61,26 @@ export class ProjectsComponent {
     );
   });
 
+  // Extract empty state title
+  emptyStateTitle = computed(() => {
+    if (this.searchQuery()) return 'No matching projects';
+    return 'No projects yet';
+  });
+
+  // Extract empty state description
+  emptyStateDescription = computed(() => {
+    const user = this.currentUser();
+    if (this.searchQuery()) return 'Try adjusting your search';
+    if (user?.role === UserRole.ADMIN) return 'Get started by creating your first project';
+    return 'You are not assigned to any projects yet';
+  });
+
+  // Extract project count label
+  projectCountLabel = computed(() => {
+    const count = this.filteredProjects().length;
+    return `${count} project${count !== 1 ? 's' : ''}`;
+  });
+
   constructor() {
     // Load projects when the current user is available.
     // Use untracked() to avoid re-running due to service cache updates.

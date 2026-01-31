@@ -151,6 +151,25 @@ export class TasksComponent implements OnInit {
     );
   });
 
+  // Extract plural task count label
+  taskCountLabel = computed(() => {
+    const count = this.filteredAndSortedTasks().length;
+    return `${count} task${count !== 1 ? 's' : ''}`;
+  });
+
+  // Extract view mode button classes
+  viewGridButtonClass = computed(() =>
+    this.viewMode() === 'grid'
+      ? 'h-8 w-8 rounded bg-secondary flex items-center justify-center'
+      : 'h-8 w-8 rounded hover:bg-accent flex items-center justify-center transition-colors',
+  );
+
+  viewTableButtonClass = computed(() =>
+    this.viewMode() === 'table'
+      ? 'h-8 w-8 rounded bg-secondary flex items-center justify-center'
+      : 'h-8 w-8 rounded hover:bg-accent flex items-center justify-center transition-colors',
+  );
+
   ngOnInit() {
     this.loadData();
   }
