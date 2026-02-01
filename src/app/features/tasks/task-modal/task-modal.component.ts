@@ -166,7 +166,8 @@ export class TaskModalComponent implements OnInit, OnDestroy {
 
     this.projectIdControl.valueChanges
       .pipe(
-        startWith(this.projectIdControl.value),
+        debounceTime(300),
+        distinctUntilChanged(),
         switchMap((projectId) => this.fetchAssignees$(projectId)),
         takeUntilDestroyed(this.destroyRef)
       )
@@ -203,6 +204,12 @@ export class TaskModalComponent implements OnInit, OnDestroy {
       if (this.defaultProjectId && !this.projectIdControl.value) {
         this.projectIdControl.setValue(this.defaultProjectId, { emitEvent: false });
         this.updateAssigneesAvailability(this.defaultProjectId);
+        // Manually fetch assignees after setting projectId
+        this.fetchAssignees$(this.defaultProjectId)
+          .pipe(takeUntilDestroyed(this.destroyRef))
+          .subscribe((users) => {
+            this.assignees = this.normalizeUsers(users);
+          });
       }
     }
 
@@ -249,7 +256,7 @@ export class TaskModalComponent implements OnInit, OnDestroy {
           status: this.task.status,
           priority: this.task.priority,
           projectId: this.task.projectId,
-          startDate: null,
+          startDate: this.task.startDate ? this.formatDateValue(this.task.startDate) : null,
           dueDate: this.task.dueDate ? this.formatDateValue(this.task.dueDate) : null,
           assigneesIds:
             this.task.assignees && this.task.assignees.length > 0
@@ -264,6 +271,12 @@ export class TaskModalComponent implements OnInit, OnDestroy {
       );
       this.updateDueDateAvailability(this.startDateControl.value);
       this.updateAssigneesAvailability(this.projectIdControl.value);
+      // Explicitly fetch assignees for the task's project
+      this.fetchAssignees$(this.task.projectId)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe((users) => {
+          this.assignees = this.normalizeUsers(users);
+        });
       this.subtasks = [...(this.task.subtasks || [])];
       this.comments = [...(this.task.comments || [])];
       this.attachments = [...(this.task.attachments || [])];
@@ -294,13 +307,19 @@ export class TaskModalComponent implements OnInit, OnDestroy {
     this.skipPersist = false;
   }
 
-  formatDateValue(date: Date | null | undefined): string {
+  formatDateValue(date: Date | string | null | undefined): string {
     if (!date) return '';
+    // Handle string dates from backend
+    if (typeof date === 'string') {
+      return date.split('T')[0];
+    }
+    // Handle Date objects
     return date.toISOString().split('T')[0];
   }
 
   private parseDateValue(dateString: string | null | undefined): Date | null {
     if (!dateString) return null;
+    // Handle both ISO strings and date strings
     const parsed = new Date(dateString);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
@@ -312,13 +331,34 @@ export class TaskModalComponent implements OnInit, OnDestroy {
   async onSubmit(event: Event) {
     event.preventDefault();
 
-    if (this.taskForm.invalid) {
+    // Allow submission if form has no errors, even if async validators are pending
+    if (this.taskForm.invalid && this.taskForm.status !== 'PENDING') {
       this.taskForm.markAllAsTouched();
       return;
     }
 
+    // If still pending, wait for async validators to complete
+    if (this.taskForm.status === 'PENDING') {
+      await firstValueFrom(
+        this.taskForm.statusChanges.pipe(
+          debounceTime(100),
+          distinctUntilChanged(),
+          takeUntilDestroyed(this.destroyRef),
+        ),
+      ).catch(() => {
+        // If there's an error waiting for status, proceed anyway
+      });
+
+      // Check again after waiting
+      if (this.taskForm.invalid) {
+        this.taskForm.markAllAsTouched();
+        return;
+      }
+    }
+
     // Prepare payloads per backend contract
     const labelIds = (this.labelsControl.value || []).map((l) => l.id).filter(Boolean);
+    const startDate = this.parseDateValue(this.startDateControl.value) ?? undefined;
     const dueDate = this.parseDateValue(this.dueDateControl.value) ?? undefined;
 
     if (this.isEditing && this.task) {
@@ -343,21 +383,24 @@ export class TaskModalComponent implements OnInit, OnDestroy {
       const taskData = {
         status: this.statusControl.value,
         subtasks: subtasks.length > 0 ? subtasks : undefined,
-        ...(!(
-          (this.task?.assignees || []).some((a) => a.id === this.currentUser?.id) &&
-          this.currentUser?.role === 'USER'
-        ) && {
-          title: this.titleControl.value,
-          description: this.descriptionControl.value,
-          priority: this.priorityControl.value,
-          dueDate,
-          labelIds: labelIds.length > 0 ? labelIds : undefined,
-        }),
+        title: this.titleControl.value,
+        description: this.descriptionControl.value,
+        priority: this.priorityControl.value,
+        startDate,
+        dueDate,
+        labelIds: labelIds.length > 0 ? labelIds : undefined,
       };
 
       try {
-        await firstValueFrom(this.tasksService.updateTask(this.task.id, taskData));
+        const updatedTask = await firstValueFrom(this.tasksService.updateTask(this.task.id, taskData));
         this.formState.clear(this.draftKey);
+        
+        // Update service signal so all components get the updated task
+        this.tasksService.tasksSignal.update((tasks) =>
+          tasks.map((t) => (t.id === this.task!.id ? updatedTask : t))
+        );
+        
+        this.task = updatedTask;
         this.openChange.emit(false);
         this.resetForm();
       } catch {
@@ -369,6 +412,7 @@ export class TaskModalComponent implements OnInit, OnDestroy {
         description: this.descriptionControl.value,
         status: this.statusControl.value,
         priority: this.priorityControl.value,
+        startDate,
         dueDate,
         projectId: this.projectIdControl.value,
         assigneeIds: this.assigneesIdsControl.value,
@@ -614,8 +658,8 @@ export class TaskModalComponent implements OnInit, OnDestroy {
   }
 
   private saveDraft(): void {
-    // Only save draft for CREATE mode, not EDIT mode
-    if (this.skipPersist || !this.draftKey || !this.open || this.isEditing) {
+    // Don't save if persisting is skipped or modal is closed
+    if (this.skipPersist || !this.draftKey || !this.open) {
       return;
     }
     this.formState.save(this.draftKey, {

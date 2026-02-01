@@ -11,7 +11,9 @@ export interface CreateTaskDto {
   description?: string;
   status?: TaskStatus;
   priority?: TaskPriority;
+  startDate?: Date;
   dueDate?: Date;
+
   position?: number;
   projectId: string;
   assigneeIds?: string[];
@@ -23,6 +25,7 @@ export interface UpdateTaskDto {
   description?: string;
   status?: TaskStatus;
   priority?: TaskPriority;
+  startDate?: Date;
   dueDate?: Date;
   position?: number;
   labelIds?: string[];

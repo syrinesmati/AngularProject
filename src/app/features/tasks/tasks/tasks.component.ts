@@ -69,7 +69,6 @@ export class TasksComponent implements OnInit {
 
   // State signals
   isLoading = signal(true);
-  tasks = signal<Task[]>([]);
   private tasksVersion = signal(0);
   selectedTask = signal<Task | null>(null);
   isModalOpen = signal(false);
@@ -109,7 +108,7 @@ export class TasksComponent implements OnInit {
     const cached = this.sortedCache.get(cacheKey);
     if (cached) return cached;
 
-    let result = [...this.tasks()];
+    let result = [...this.tasksService.tasksSignal()];
 
     // Search filter
     if (query) {
@@ -241,7 +240,7 @@ export class TasksComponent implements OnInit {
         .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe({
           next: (response) => {
-            this.tasks.set(response.data);
+            this.tasksService.tasksSignal.set(response.data);
             this.tasksVersion.update((v) => v + 1);
             this.isLoading.set(false);
           },
@@ -256,7 +255,7 @@ export class TasksComponent implements OnInit {
         .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe({
           next: (response) => {
-            this.tasks.set(response);
+            this.tasksService.tasksSignal.set(response);
             this.tasksVersion.update((v) => v + 1);
             this.isLoading.set(false);
           },
