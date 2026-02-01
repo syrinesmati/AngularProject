@@ -1,7 +1,20 @@
-import { Component, signal, inject, computed, effect, OnInit } from '@angular/core';
+import {
+  Component,
+  signal,
+  inject,
+  computed,
+  effect,
+  OnInit,
+  DestroyRef,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { ScrollingModule } from '@angular/cdk/scrolling';
 import { RouterLink } from '@angular/router';
 import { formatDistanceToNow } from 'date-fns';
+import { interval, firstValueFrom } from 'rxjs';
+import { switchMap } from 'rxjs/operators';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideIconComponent } from '../../shared/components/lucide-icon/lucide-icon.component';
 import { NotificationsService } from '../../core/services/notifications.service';
 import { Notification, NotificationType } from '../../core/models/notification.model';
@@ -9,12 +22,14 @@ import { Notification, NotificationType } from '../../core/models/notification.m
 @Component({
   selector: 'app-notifications-dropdown',
   standalone: true,
-  imports: [CommonModule, RouterLink, LucideIconComponent],
+  imports: [CommonModule, RouterLink, LucideIconComponent, ScrollingModule],
   templateUrl: './notifications-dropdown.component.html',
   styleUrls: ['./notifications-dropdown.component.css'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class NotificationsDropdownComponent implements OnInit {
   public notificationsService = inject(NotificationsService);
+  private destroyRef = inject(DestroyRef);
 
   // UI state
   showDropdown = signal(false);
@@ -40,16 +55,19 @@ export class NotificationsDropdownComponent implements OnInit {
 
   private startPolling() {
     // Poll for unread count updates every 30 seconds
-    setInterval(() => {
-      this.notificationsService.loadUnreadCount().subscribe({
+    interval(30000)
+      .pipe(
+        switchMap(() => this.notificationsService.loadUnreadCount()),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
         next: () => {
           // Unread count updated
         },
-        error: (error) => {
-          console.error('Failed to poll unread count:', error);
-        }
+        error: () => {
+          // Silently fail polling
+        },
       });
-    }, 30000); // 30 seconds
   }
 
   toggleDropdown() {
@@ -57,58 +75,46 @@ export class NotificationsDropdownComponent implements OnInit {
       const newValue = !v;
       // When opening the dropdown, load latest notifications
       if (newValue) {
-        this.notificationsService.loadNotifications().subscribe({
-          next: () => {
-            // Notifications loaded
-          },
-          error: (error) => {
-            console.error('Failed to load notifications when opening dropdown:', error);
-          }
-        });
+        void this.loadNotificationsOnce();
       }
       return newValue;
     });
   }
 
+  async markAsRead(notificationId: string) {
+    const notification = this.notifications().find((n) => n.id === notificationId);
 
-  markAsRead(notificationId: string) {
-    console.log('Marking notification as read:', notificationId);
-    const notification = this.notifications().find(n => n.id === notificationId);
-    console.log('Notification before:', notification);
-
-    this.notificationsService.markAsReadWithSignal(notificationId).subscribe({
-      next: (updatedNotification) => {
-        console.log('Notification marked as read successfully:', updatedNotification);
-        console.log('Unread count after:', this.unreadCount());
-        this.playNotificationSound();
-      },
-      error: (error) => {
-        console.error('Failed to mark notification as read:', error);
-      }
-    });
+    try {
+      await firstValueFrom(this.notificationsService.markAsReadWithSignal(notificationId));
+      this.playNotificationSound();
+    } catch {
+      // No-op
+    }
   }
 
-  markAllAsRead() {
-    this.notificationsService.markAllAsReadWithSignal().subscribe({
-      next: () => {
-        // All notifications marked as read
-        this.playNotificationSound();
-      },
-      error: (error) => {
-        console.error('Failed to mark all notifications as read:', error);
-      }
-    });
+  async markAllAsRead() {
+    try {
+      await firstValueFrom(this.notificationsService.markAllAsReadWithSignal());
+      this.playNotificationSound();
+    } catch {
+      // No-op
+    }
   }
 
-  deleteNotification(notificationId: string) {
-    this.notificationsService.deleteNotificationWithSignal(notificationId).subscribe({
-      next: () => {
-        // Notification deleted
-      },
-      error: (error) => {
-        console.error('Failed to delete notification:', error);
-      }
-    });
+  async deleteNotification(notificationId: string) {
+    try {
+      await firstValueFrom(this.notificationsService.deleteNotificationWithSignal(notificationId));
+    } catch {
+      // No-op
+    }
+  }
+
+  private async loadNotificationsOnce(): Promise<void> {
+    try {
+      await firstValueFrom(this.notificationsService.loadNotifications());
+    } catch {
+      // No-op
+    }
   }
 
   setTypeFilter(type: string | null) {
@@ -132,7 +138,6 @@ export class NotificationsDropdownComponent implements OnInit {
       }
       return formatDistanceToNow(dateObj, { addSuffix: true });
     } catch (error) {
-      console.error('Error parsing date:', date, error);
       return 'Invalid date';
     }
   }
@@ -160,6 +165,8 @@ export class NotificationsDropdownComponent implements OnInit {
     };
     return colors[type] || 'bg-gray-500/10 text-gray-600';
   }
+
+  trackByNotificationId = (_index: number, notification: Notification) => notification.id;
 
   // Swipe gesture methods
   private swipeStartX: number = 0;
@@ -197,7 +204,9 @@ export class NotificationsDropdownComponent implements OnInit {
     if (!notificationId || !this.swipeElement) return;
 
     const transform = this.swipeElement.style.transform;
-    const offset = transform ? parseFloat(transform.replace('translateX(', '').replace('px)', '')) : 0;
+    const offset = transform
+      ? parseFloat(transform.replace('translateX(', '').replace('px)', ''))
+      : 0;
 
     // Reset transform
     this.swipeElement.style.transform = '';

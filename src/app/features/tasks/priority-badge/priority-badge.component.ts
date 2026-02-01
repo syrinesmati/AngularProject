@@ -1,4 +1,4 @@
-import { Component, input, computed } from '@angular/core';
+import { Component, input, computed, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { TaskPriority } from '../../../core/models/task.model';
 
@@ -7,34 +7,35 @@ import { TaskPriority } from '../../../core/models/task.model';
   imports: [CommonModule],
   templateUrl: './priority-badge.component.html',
   styleUrl: './priority-badge.component.css',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class PriorityBadgeComponent {
   priority = input.required<TaskPriority>();
   showLabel = input(true);
-  
+
   private priorityConfig = {
     [TaskPriority.LOW]: {
       label: 'Low',
       class: 'bg-priority-low-bg text-priority-low',
-      icon: 'down'
+      icon: 'down',
     },
     [TaskPriority.MEDIUM]: {
       label: 'Medium',
       class: 'bg-priority-medium-bg text-priority-medium',
-      icon: 'right'
+      icon: 'right',
     },
     [TaskPriority.HIGH]: {
       label: 'High',
       class: 'bg-priority-high-bg text-priority-high',
-      icon: 'up'
+      icon: 'up',
     },
     [TaskPriority.URGENT]: {
       label: 'Urgent',
       class: 'bg-red-100 text-red-800',
-      icon: 'up'
-    }
+      icon: 'up',
+    },
   };
-  
+
   config = computed(() => this.priorityConfig[this.priority()]);
   badgeClasses = computed(() => this.config().class);
 }

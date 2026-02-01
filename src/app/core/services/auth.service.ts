@@ -1,7 +1,6 @@
-// auth.service.ts - FIXED version with proper public refreshCurrentUser method
 import { Injectable, signal, computed, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { BehaviorSubject, Observable, tap } from 'rxjs';
+import { BehaviorSubject, Observable, tap, map, catchError, of } from 'rxjs';
 import { User, UserRole, AuthResponse, LoginDto, RegisterDto } from '../models/user.model';
 import { BaseService } from './base.service';
 import { WebSocketService } from './websocket.service';
@@ -25,9 +24,7 @@ export class AuthService extends BaseService {
   isAdmin = computed(() => this.currentUserSignal()?.role === UserRole.ADMIN);
 
   isAuthenticated(): boolean {
-    const isAuth = this.currentUserSignal() !== null;
-    console.log('isAuthenticated check:', { isAuth, user: this.currentUserSignal() });
-    return isAuth;
+    return this.currentUserSignal() !== null;
   }
 
   constructor() {
@@ -37,22 +34,16 @@ export class AuthService extends BaseService {
 
   private loadUserFromStorage(): void {
     const userJson = localStorage.getItem('currentUser');
-    console.log('Loading user from storage:', { userJson: !!userJson });
     if (userJson) {
       try {
         const user = JSON.parse(userJson);
-        console.log('Setting current user from storage:', user);
         this.updateCurrentUser(user);
         // Reconnect WebSocket if user is loaded from storage
         this.webSocketService.reconnect();
       } catch (error) {
-        console.error('Error parsing user data from localStorage:', error);
         // Clear corrupted data
         localStorage.removeItem('currentUser');
-        console.log('Cleared corrupted user data from localStorage');
       }
-    } else {
-      console.log('No user data in storage');
     }
   }
 
@@ -92,6 +83,22 @@ export class AuthService extends BaseService {
         this.updateCurrentUser(response.user);
       })
     );
+  }
+
+  /**
+   * Verify current password
+   * Used by password change form validation
+   */
+  verifyCurrentPassword(password: string): Observable<boolean> {
+    return this.http
+      .post<any>(this.buildUrl('/auth/verify-password'), { password }, { withCredentials: true })
+      .pipe(
+        map((response) => {
+          // Handle both response structures: { isValid: boolean } and { data: { isValid: boolean } }
+          return response.data?.isValid ?? response.isValid;
+        }),
+        catchError(() => of(false))
+      );
   }
 
   /**
@@ -139,11 +146,9 @@ export class AuthService extends BaseService {
    * Update current user in state and storage (internal use)
    */
   private updateCurrentUser(user: User): void {
-    console.log('Updating current user:', user);
     localStorage.setItem('currentUser', JSON.stringify(user));
     this.currentUserSubject.next(user);
     this.currentUserSignal.set(user);
-    console.log('Current user signal set to:', this.currentUserSignal());
   }
 
   /**
@@ -151,7 +156,6 @@ export class AuthService extends BaseService {
    * This is the public method that components should call
    */
   refreshCurrentUser(user: User): void {
-    console.log('Refreshing current user:', user);
     this.updateCurrentUser(user);
   }
 

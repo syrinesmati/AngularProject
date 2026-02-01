@@ -1,6 +1,7 @@
-import { Injectable, signal, computed, inject } from '@angular/core';
+import { Injectable, signal, computed, inject, DestroyRef } from '@angular/core';
 import { Router, NavigationEnd, ActivatedRoute } from '@angular/router';
 import { filter } from 'rxjs/operators';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 /**
  * Represents a single breadcrumb item
@@ -26,6 +27,7 @@ export interface Breadcrumb {
 export class NavigationService {
   private router = inject(Router);
   private activatedRoute = inject(ActivatedRoute);
+  private destroyRef = inject(DestroyRef);
 
   // Signals for state management
   private breadcrumbsSignal = signal<Breadcrumb[]>([]);
@@ -47,7 +49,10 @@ export class NavigationService {
    */
   private initializeNavigation(): void {
     this.router.events
-      .pipe(filter((event) => event instanceof NavigationEnd))
+      .pipe(
+        filter((event) => event instanceof NavigationEnd),
+        takeUntilDestroyed(this.destroyRef),
+      )
       .subscribe((event: any) => {
         const url = event.urlAfterRedirects;
         this.currentRouteSignal.set(url);

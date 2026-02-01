@@ -1,15 +1,22 @@
-import { Component, inject, signal, computed, effect, untracked } from '@angular/core';
+import {
+  Component,
+  inject,
+  signal,
+  computed,
+  effect,
+  untracked,
+  DestroyRef,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { forkJoin, of } from 'rxjs';
-import { map, catchError } from 'rxjs/operators';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ProjectsService } from '../../../core/services/projects.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { Project, ProjectMemberRole } from '../../../core/models/project.model';
 import { UserRole } from '../../../core/models/user.model';
 import { ProjectCardComponent } from '../project-card/project-card.component';
 import { ProjectModalComponent } from '../project-modal/project-modal.component';
-import { TasksService } from '../../../core/services/task.service';
 
 @Component({
   selector: 'app-projects.component',
@@ -17,11 +24,12 @@ import { TasksService } from '../../../core/services/task.service';
   imports: [CommonModule, FormsModule, ProjectCardComponent, ProjectModalComponent],
   templateUrl: './projects.component.html',
   styleUrls: ['./projects.component.css'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProjectsComponent {
   private projectsService = inject(ProjectsService);
   private authService = inject(AuthService);
-  private tasksService = inject(TasksService);
+  private destroyRef = inject(DestroyRef);
 
   currentUser = this.authService.currentUserSignal;
   UserRole = UserRole;
@@ -55,10 +63,35 @@ export class ProjectsComponent {
     return list.filter(
       (p) =>
         p.name.toLowerCase().includes(query) ||
-        (p.description && p.description.toLowerCase().includes(query))
+        (p.description && p.description.toLowerCase().includes(query)),
     );
   });
 
+  // Extract empty state title
+  emptyStateTitle = computed(() => {
+    if (this.searchQuery()) return 'No matching projects';
+    return 'No projects yet';
+  });
+
+  // Extract empty state description
+  emptyStateDescription = computed(() => {
+    const user = this.currentUser();
+    if (this.searchQuery()) return 'Try adjusting your search';
+    if (user?.role === UserRole.ADMIN) return 'Get started by creating your first project';
+    return 'You are not assigned to any projects yet';
+  });
+
+  // Extract project count label
+  projectCountLabel = computed(() => {
+    const count = this.filteredProjects().length;
+    return `${count} project${count !== 1 ? 's' : ''}`;
+  });
+
+  // Memoize admin role check to avoid repeated calls
+  isCurrentUserAdmin = computed(() => this.currentUser()?.role === UserRole.ADMIN);
+
+  // Memoize empty state creation button visibility
+  showCreateInEmptyState = computed(() => !this.searchQuery() && this.isCurrentUserAdmin());
   constructor() {
     // Load projects when the current user is available.
     // Use untracked() to avoid re-running due to service cache updates.
@@ -74,75 +107,27 @@ export class ProjectsComponent {
 
   private loadProjects() {
     this.isLoading.set(true);
-    this.projectsService.loadProjects().subscribe({
-      next: (projects) => {
-        console.log('📦 Loaded projects:', projects.length);
-        
-        // Fetch members and tasks for each project
-        if (projects.length === 0) {
-          this.projects.set([]);
+    this.projectsService
+      .loadProjects()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (projects) => {
+          // Backend now returns projects with members and tasks included
+          // No need for additional API calls - N+1 problem solved!
+          this.projects.set(this.filterVisibleProjects(projects));
           this.isLoading.set(false);
-          return;
-        }
-
-      const projectsWithMembersAndTasks$ = projects.map((project) =>
-        forkJoin({
-          members: this.projectsService.loadProjectMembers(project.id).pipe(
-            catchError(() => {
-              console.warn(`Failed to load members for project ${project.id}`);
-              return of([]);
-            })
-          ),
-          tasks: this.tasksService.getTasksByProject(project.id).pipe(
-            map(response => response.data),
-            catchError(() => {
-              console.warn(`Failed to load tasks for project ${project.id}`);
-              return of([]);
-            })
-          )
-        }).pipe(
-          map(({ members, tasks }) => {
-            console.log(`👥 Members for ${project.name}:`, members.length);
-            console.log(`📋 Tasks for ${project.name}:`, tasks.length);
-            return { ...project, members, tasks };
-          })
-        )
-      );
-
-        forkJoin(projectsWithMembersAndTasks$).subscribe({
-          next: (enrichedProjects: any) => {
-            console.log('✅ Enriched projects:', enrichedProjects);
-            this.projects.set(this.filterVisibleProjects(enrichedProjects as Project[]));
-            this.isLoading.set(false);
-          },
-          error: (err) => {
-            console.error('Failed to enrich projects with members and tasks:', err);
-            this.projects.set(this.filterVisibleProjects(projects)); // Fallback to projects without members/tasks
-            this.isLoading.set(false);
-          },
-        });
-      },
-      error: (err: any) => {
-        console.error('Failed to load projects:', err);
-        this.isLoading.set(false);
-      },
-    });
+        },
+        error: () => {
+          this.isLoading.set(false);
+        },
+      });
   }
 
   onProjectCreated(newProject: Project) {
-    // Fetch members for the newly created project (owner is auto-added)
-     const members = this.projectsService.getProjectMembers(newProject.id)();
-     of(members).subscribe({
-      next: (members) => {
-        const enrichedProject = { ...newProject, members };
-        this.projects.update((current) => this.filterVisibleProjects([enrichedProject, ...current]));
-      },
-      error: () => {
-        // Fallback: add project without members
-        console.warn(`Failed to load members for new project ${newProject.id}`);
-        this.projects.update((current) => this.filterVisibleProjects([{ ...newProject, members: [] }, ...current]));
-      },
-    });
+    // Backend returns complete project with members, tasks, and owner
+    this.projects.update((current) =>
+      this.filterVisibleProjects([newProject, ...current]),
+    );
     this.showModal.set(false);
     this.selectedProject.set(null);
   }
@@ -153,7 +138,9 @@ export class ProjectsComponent {
 
   onProjectUpdated(updatedProject: Project) {
     this.projects.update((current) =>
-      this.filterVisibleProjects(current.map((p) => (p.id === updatedProject.id ? updatedProject : p)))
+      this.filterVisibleProjects(
+        current.map((p) => (p.id === updatedProject.id ? updatedProject : p)),
+      ),
     );
     this.showModal.set(false);
     this.selectedProject.set(null);
@@ -162,12 +149,15 @@ export class ProjectsComponent {
   onDeleteProject(projectId: string) {
     const user = this.currentUser();
     if (!user || user.role !== UserRole.ADMIN) return;
-    this.projectsService.deleteProject(projectId).subscribe({
-      next: () => {
-        this.projects.update((current) => current.filter((p) => p.id !== projectId));
-      },
-      error: (err) => console.error('Failed to delete project:', err),
-    });
+    this.projectsService
+      .deleteProject(projectId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.projects.update((current) => current.filter((p) => p.id !== projectId));
+        },
+        error: () => {},
+      });
   }
 
   onOpenEdit(project: Project) {
@@ -175,7 +165,6 @@ export class ProjectsComponent {
     if (!user) return;
     const canEdit = this.canEditProject(project);
     if (!canEdit) {
-      console.warn('Edit not allowed: only ADMIN or owner can edit');
       return;
     }
     this.selectedProject.set(project);
@@ -193,7 +182,7 @@ export class ProjectsComponent {
     if (user.role === UserRole.ADMIN) return true;
     const isOwnerById = project.ownerId === user.id;
     const isOwnerByMembership = (project.members ?? []).some(
-      (m) => m.userId === user.id && m.role === ProjectMemberRole.OWNER
+      (m) => m.userId === user.id && m.role === ProjectMemberRole.OWNER,
     );
     return isOwnerById || isOwnerByMembership;
   }
@@ -208,26 +197,34 @@ export class ProjectsComponent {
   onArchiveProject(project: Project) {
     const user = this.currentUser();
     if (!user || user.role !== UserRole.ADMIN) return;
-    this.projectsService.toggleArchive(project.id, true).subscribe({
-      next: (updated) => {
-        this.projects.update((current) =>
-          this.filterVisibleProjects(current.map((p) => (p.id === project.id ? { ...p, isArchived: true } : p)))
-        );
-      },
-      error: (err) => console.error('Failed to archive project:', err),
-    });
+    this.projectsService
+      .toggleArchive(project.id, true)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.projects.update((current) =>
+            this.filterVisibleProjects(
+              current.map((p) => (p.id === project.id ? { ...p, isArchived: true } : p)),
+            ),
+          );
+        },
+        error: () => {},
+      });
   }
 
   onUnarchiveProject(project: Project) {
     const user = this.currentUser();
     if (!user || user.role !== UserRole.ADMIN) return;
-    this.projectsService.toggleArchive(project.id, false).subscribe({
-      next: (updated) => {
-        this.projects.update((current) =>
-          current.map((p) => (p.id === project.id ? { ...p, isArchived: false } : p))
-        );
-      },
-      error: (err) => console.error('Failed to unarchive project:', err),
-    });
+    this.projectsService
+      .toggleArchive(project.id, false)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.projects.update((current) =>
+            current.map((p) => (p.id === project.id ? { ...p, isArchived: false } : p)),
+          );
+        },
+        error: () => {},
+      });
   }
 }

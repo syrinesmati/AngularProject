@@ -1,4 +1,12 @@
-import { Component, input, output, signal, ViewChild, ElementRef } from '@angular/core';
+import {
+  Component,
+  input,
+  output,
+  signal,
+  ViewChild,
+  ElementRef,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Attachment } from '../../../core/models/task.model';
 
@@ -8,11 +16,17 @@ import { Attachment } from '../../../core/models/task.model';
   imports: [CommonModule],
   templateUrl: './attachment-section.component.html',
   styleUrl: './attachment-section.component.css',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AttachmentSectionComponent {
   attachments = input.required<Attachment[]>();
-  
-  addAttachment = output<{ fileName: string; fileUrl: string; mimeType: string; fileSize: number }>();
+
+  addAttachment = output<{
+    fileName: string;
+    fileUrl: string;
+    mimeType: string;
+    fileSize: number;
+  }>();
   removeAttachment = output<string>();
 
   @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;
@@ -21,26 +35,17 @@ export class AttachmentSectionComponent {
     const input = event.target as HTMLInputElement;
     if (!input.files) return;
 
-    Array.from(input.files).forEach(file => {
-      // TODO: In production, upload to server/S3 and get URL
-      // For now, we'll use a placeholder URL since blob URLs don't persist
-      const url = `https://placeholder-storage.example.com/${Date.now()}-${file.name}`;
-      
-      // NOTE: This is a mock implementation. In a real app, you would:
-      // 1. Upload the file to your backend or cloud storage (S3, Azure Blob, etc.)
-      // 2. Get the permanent URL from the upload response
-      // 3. Then emit the attachment with the real URL
-      
-      console.warn('File upload not implemented. Using placeholder URL:', url);
-      console.warn('To implement: Upload file to backend/storage service first');
-      
+    // Use for...of for clearer side-effect intent
+    for (const file of Array.from(input.files)) {
+      // In production, upload to server/S3 and get URL
+      const url = URL.createObjectURL(file);
       this.addAttachment.emit({
         fileName: file.name,
         fileUrl: url,
         mimeType: file.type,
-        fileSize: file.size
+        fileSize: file.size,
       });
-    });
+    }
 
     // Reset input
     input.value = '';

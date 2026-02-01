@@ -1,7 +1,13 @@
 // profile-form.component.ts - CORRECTED with better error handling and logging
-import { Component, DestroyRef, inject, signal } from '@angular/core';
+import { Component, DestroyRef, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ReactiveFormsModule, FormBuilder, FormGroup, FormControl, Validators } from '@angular/forms';
+import {
+  ReactiveFormsModule,
+  FormBuilder,
+  FormGroup,
+  FormControl,
+  Validators,
+} from '@angular/forms';
 import { Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { UsersService, UpdateProfileDto } from '../../../core/services/users.service';
@@ -12,6 +18,7 @@ import { AuthService } from '../../../core/services/auth.service';
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule],
   templateUrl: './profile-form.component.html',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProfileFormComponent {
   private fb = inject(FormBuilder);
@@ -37,18 +44,25 @@ export class ProfileFormComponent {
     avatar: [null],
   });
 
-  get firstName() { return this.form.get('firstName') as FormControl<string>; }
-  get lastName() { return this.form.get('lastName') as FormControl<string>; }
-  get avatar() { return this.form.get('avatar') as FormControl<string | null>; }
+  get firstName() {
+    return this.form.get('firstName') as FormControl<string>;
+  }
+  get lastName() {
+    return this.form.get('lastName') as FormControl<string>;
+  }
+  get avatar() {
+    return this.form.get('avatar') as FormControl<string | null>;
+  }
 
   constructor() {
     // Auto-fill form with current user data
-    this.users.getProfile()
+    this.users
+      .getProfile()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (user) => {
           console.log('Profile loaded from API:', user);
-          
+
           // Set the values WITHOUT triggering validators
           this.firstName.setValue(user.firstName ?? '', { emitEvent: false });
           this.lastName.setValue(user.lastName ?? '', { emitEvent: false });
@@ -57,13 +71,13 @@ export class ProfileFormComponent {
           console.log('Form values set to:', {
             firstName: this.firstName.value,
             lastName: this.lastName.value,
-            avatar: this.avatar.value
+            avatar: this.avatar.value,
           });
 
           // Mark form as pristine and untouched so it appears clean on load
           this.form.markAsPristine();
           this.form.markAsUntouched();
-          
+
           // Show existing avatar if present
           if (user.avatar) {
             this.avatarPreview.set(user.avatar);
@@ -83,7 +97,7 @@ export class ProfileFormComponent {
   onFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
-    
+
     if (!file) return;
 
     this.uploadError.set(null);
@@ -142,7 +156,7 @@ export class ProfileFormComponent {
     console.log('Submit called');
     console.log('Form valid:', this.form.valid);
     console.log('Form value:', this.form.value);
-    
+
     if (this.form.invalid) {
       console.error('Form is invalid');
       return;
@@ -150,7 +164,7 @@ export class ProfileFormComponent {
 
     this.isSubmitting.set(true);
     const v = this.form.value;
-    
+
     const dto: UpdateProfileDto = {
       firstName: v.firstName?.trim() || '',
       lastName: v.lastName?.trim() || '',
@@ -159,7 +173,8 @@ export class ProfileFormComponent {
 
     console.log('Sending update DTO:', dto);
 
-    this.users.updateProfile(dto)
+    this.users
+      .updateProfile(dto)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (updatedUser) => {
@@ -167,18 +182,16 @@ export class ProfileFormComponent {
           console.log('Updated user firstName:', updatedUser.firstName);
           console.log('Updated user lastName:', updatedUser.lastName);
           console.log('Updated user avatar:', updatedUser.avatar);
-          
+
           // Refresh the current user signal to update the header immediately
           this.auth.refreshCurrentUser(updatedUser);
-          
+
           console.log('Current user signal after refresh:', this.auth.currentUserSignal());
-          
+
           this.isSubmitting.set(false);
-          
+
           // Small delay to ensure signal update is processed before navigation
-          setTimeout(() => {
-            this.router.navigate(['/dashboard']);
-          }, 100);
+          this.router.navigate(['/dashboard']);
         },
         error: (err) => {
           console.error('Profile update error:', err);

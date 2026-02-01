@@ -1,27 +1,27 @@
-import { 
-  Component, 
-  signal, 
-  HostListener, 
-  ElementRef, 
-  OnInit, 
-  OnDestroy,
+import {
+  Component,
+  signal,
+  HostListener,
+  ElementRef,
+  OnInit,
   ChangeDetectionStrategy,
-  inject
+  inject,
+  DestroyRef,
+  AfterViewInit,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { Subject } from 'rxjs';
-import { 
-  debounceTime, 
-  distinctUntilChanged, 
-  switchMap, 
-  takeUntil,
+import { of, timer } from 'rxjs';
+import {
+  debounceTime,
+  distinctUntilChanged,
+  switchMap,
   tap,
   catchError,
-  finalize
+  finalize,
 } from 'rxjs/operators';
-import { of } from 'rxjs';
 import { LucideIconComponent } from '../../shared/components/lucide-icon/lucide-icon.component';
 import { SearchService, GlobalSearchResults } from '../../core/services/search.service';
 import { LoggerService } from '../../core/services/logger.service';
@@ -37,12 +37,13 @@ import { Comment } from '../../core/models/task.model';
   styleUrls: ['./global-search.component.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class GlobalSearchComponent implements OnInit, OnDestroy {
+export class GlobalSearchComponent implements OnInit, AfterViewInit {
   // Inject services
   private searchService = inject(SearchService);
   private router = inject(Router);
   private elementRef = inject(ElementRef);
   private logger = inject(LoggerService);
+  private destroyRef = inject(DestroyRef);
 
   // Reactive Form Control for search input
   searchControl = new FormControl('');
@@ -51,22 +52,18 @@ export class GlobalSearchComponent implements OnInit, OnDestroy {
   isOpen = signal(false);
   isLoading = signal(false);
   error = signal<string | null>(null);
-  
+
   // Results signals
   tasks = signal<Task[]>([]);
   projects = signal<Project[]>([]);
   comments = signal<Comment[]>([]);
 
-  // Subject for cleanup
-  private destroy$ = new Subject<void>();
-
   ngOnInit() {
     this.setupSearchSubscription();
   }
 
-  ngOnDestroy() {
-    this.destroy$.next();
-    this.destroy$.complete();
+  ngAfterViewInit() {
+    // Setup is done in ngOnInit
   }
 
   /**
@@ -106,11 +103,11 @@ export class GlobalSearchComponent implements OnInit, OnDestroy {
                 loading: false,
                 error: 'Failed to search. Please try again.',
               } as GlobalSearchResults);
-            })
+            }),
           );
         }),
         finalize(() => this.isLoading.set(false)),
-        takeUntil(this.destroy$)
+        takeUntilDestroyed(this.destroyRef),
       )
       .subscribe((results: GlobalSearchResults) => {
         this.tasks.set(results.tasks);
@@ -144,14 +141,16 @@ export class GlobalSearchComponent implements OnInit, OnDestroy {
   openSearch() {
     this.isOpen.set(true);
     this.logger.info('Global search opened');
-    
+
     // Focus input after a brief delay to ensure DOM is ready
-    setTimeout(() => {
-      const input = this.elementRef.nativeElement.querySelector('input');
-      if (input) {
-        input.focus();
-      }
-    }, 100);
+    timer(100)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => {
+        const input = this.elementRef.nativeElement.querySelector('input');
+        if (input) {
+          input.focus();
+        }
+      });
   }
 
   closeSearch() {
@@ -196,8 +195,6 @@ export class GlobalSearchComponent implements OnInit, OnDestroy {
   }
 
   get showNoResults(): boolean {
-    return !this.isLoading() && 
-           !this.hasResults && 
-           (this.searchControl.value?.length ?? 0) >= 2;
+    return !this.isLoading() && !this.hasResults && (this.searchControl.value?.length ?? 0) >= 2;
   }
 }

@@ -1,4 +1,14 @@
-import { Component, signal, inject, computed, OnInit, ChangeDetectorRef } from '@angular/core';
+import {
+  Component,
+  signal,
+  inject,
+  computed,
+  OnInit,
+  ChangeDetectorRef,
+  DestroyRef,
+  ChangeDetectionStrategy,
+} from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { formatDistanceToNow, isToday, isYesterday, format } from 'date-fns';
 import { LucideIconComponent } from '../../../shared/components/lucide-icon/lucide-icon.component';
@@ -14,10 +24,12 @@ type ReadFilter = 'all' | 'read' | 'unread';
   imports: [CommonModule, LucideIconComponent],
   templateUrl: './notifications.component.html',
   styleUrls: ['./notifications.component.css'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class NotificationsComponent implements OnInit {
   public notificationsService = inject(NotificationsService);
   private cdr = inject(ChangeDetectorRef);
+  private destroyRef = inject(DestroyRef);
 
   // UI state
   showFilters = signal(false);
@@ -87,14 +99,17 @@ export class NotificationsComponent implements OnInit {
 
   ngOnInit() {
     // Load latest notifications when the page is opened
-    this.notificationsService.loadNotifications().subscribe({
-      next: () => {
-        // Notifications loaded
-      },
-      error: (error) => {
-        console.error('Failed to load notifications on page open:', error);
-      },
-    });
+    this.notificationsService
+      .loadNotifications()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          // Notifications loaded
+        },
+        error: (error) => {
+          console.error('Failed to load notifications on page open:', error);
+        },
+      });
   }
 
   toggleFilters() {
@@ -121,39 +136,48 @@ export class NotificationsComponent implements OnInit {
   }
 
   markAsRead(notificationId: string) {
-    this.notificationsService.markAsReadWithSignal(notificationId).subscribe({
-      next: () => {
-        // Notification marked as read
-        this.cdr.detectChanges();
-      },
-      error: (error) => {
-        console.error('Failed to mark notification as read:', error);
-      },
-    });
+    this.notificationsService
+      .markAsReadWithSignal(notificationId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          // Notification marked as read
+          this.cdr.detectChanges();
+        },
+        error: (error) => {
+          console.error('Failed to mark notification as read:', error);
+        },
+      });
   }
 
   markAllAsRead() {
-    this.notificationsService.markAllAsReadWithSignal().subscribe({
-      next: () => {
-        // All notifications marked as read
-        this.cdr.detectChanges();
-      },
-      error: (error) => {
-        console.error('Failed to mark all notifications as read:', error);
-      },
-    });
+    this.notificationsService
+      .markAllAsReadWithSignal()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          // All notifications marked as read
+          this.cdr.detectChanges();
+        },
+        error: (error) => {
+          console.error('Failed to mark all notifications as read:', error);
+        },
+      });
   }
 
   deleteNotification(notificationId: string) {
-    this.notificationsService.deleteNotificationWithSignal(notificationId).subscribe({
-      next: () => {
-        // Notification deleted
-        this.cdr.detectChanges();
-      },
-      error: (error) => {
-        console.error('Failed to delete notification:', error);
-      },
-    });
+    this.notificationsService
+      .deleteNotificationWithSignal(notificationId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          // Notification deleted
+          this.cdr.detectChanges();
+        },
+        error: (error) => {
+          console.error('Failed to delete notification:', error);
+        },
+      });
   }
 
   getTimeAgo(date: Date | string): string {

@@ -1,4 +1,4 @@
-import { Component, DestroyRef, inject, signal } from '@angular/core';
+import { Component, DestroyRef, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { UsersService } from '../../../core/services/users.service';
@@ -6,6 +6,7 @@ import { passwordStrengthValidator } from '../../../shared/validators/password-s
 import { FormStateService } from '../../../core/services/form-state.service';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '../../../core/services/auth.service';
+import { CurrentPasswordValidator } from '../../../shared/validators/current-password.validator';
 
 @Component({
   selector: 'app-security',
@@ -13,6 +14,7 @@ import { AuthService } from '../../../core/services/auth.service';
   imports: [CommonModule, ReactiveFormsModule],
   templateUrl: './security.component.html',
   styleUrls: ['./security.component.css'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SecurityComponent {
   private fb = inject(FormBuilder);
@@ -20,6 +22,7 @@ export class SecurityComponent {
   private formState = inject(FormStateService);
   private destroyRef = inject(DestroyRef);
   private authService = inject(AuthService);
+  private currentPasswordValidator = inject(CurrentPasswordValidator);
 
   private draftKey = '';
 
@@ -29,14 +32,21 @@ export class SecurityComponent {
   errorMessage = signal<string>('');
 
   constructor() {
-    this.passwordForm = this.fb.group({
-      currentPassword: ['', [Validators.required]],
-      newPassword: ['', [Validators.required, passwordStrengthValidator()]],
-      confirmPassword: ['', [Validators.required]],
-    }, { validators: this.passwordMatchValidator });
+    this.passwordForm = this.fb.group(
+      {
+        currentPassword: ['', [Validators.required], [this.currentPasswordValidator.validate()]],
+        newPassword: ['', [Validators.required, passwordStrengthValidator()]],
+        confirmPassword: ['', [Validators.required]],
+      },
+      { validators: this.passwordMatchValidator },
+    );
 
     this.draftKey = this.buildDraftKey('settings-security');
-    const saved = this.formState.restore<{ currentPassword: string; newPassword: string; confirmPassword: string }>(this.draftKey);
+    const saved = this.formState.restore<{
+      currentPassword: string;
+      newPassword: string;
+      confirmPassword: string;
+    }>(this.draftKey);
     if (saved) {
       this.passwordForm.patchValue(saved, { emitEvent: false });
     }
@@ -74,18 +84,21 @@ export class SecurityComponent {
     try {
       const formData = this.passwordForm.value;
 
-      await this.usersService.changePassword({
-        currentPassword: formData.currentPassword,
-        newPassword: formData.newPassword,
-        confirmPassword: formData.confirmPassword,
-      }).toPromise();
+      await this.usersService
+        .changePassword({
+          currentPassword: formData.currentPassword,
+          newPassword: formData.newPassword,
+          confirmPassword: formData.confirmPassword,
+        })
+        .toPromise();
 
       this.passwordForm.reset();
       this.successMessage.set('Password changed successfully!');
       this.formState.clear(this.draftKey);
     } catch (error: any) {
       console.error('Error changing password:', error);
-      const errorMessage = error?.error?.message || error?.message || 'Failed to change password. Please try again.';
+      const errorMessage =
+        error?.error?.message || error?.message || 'Failed to change password. Please try again.';
       this.errorMessage.set(errorMessage);
     } finally {
       this.isSubmitting.set(false);
