@@ -10,8 +10,6 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { forkJoin, of } from 'rxjs';
-import { map, catchError } from 'rxjs/operators';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ProjectsService } from '../../../core/services/projects.service';
 import { AuthService } from '../../../core/services/auth.service';
@@ -19,7 +17,6 @@ import { Project, ProjectMemberRole } from '../../../core/models/project.model';
 import { UserRole } from '../../../core/models/user.model';
 import { ProjectCardComponent } from '../project-card/project-card.component';
 import { ProjectModalComponent } from '../project-modal/project-modal.component';
-import { TasksService } from '../../../core/services/task.service';
 
 @Component({
   selector: 'app-projects.component',
@@ -32,7 +29,6 @@ import { TasksService } from '../../../core/services/task.service';
 export class ProjectsComponent {
   private projectsService = inject(ProjectsService);
   private authService = inject(AuthService);
-  private tasksService = inject(TasksService);
   private destroyRef = inject(DestroyRef);
 
   currentUser = this.authService.currentUserSignal;
@@ -116,53 +112,11 @@ export class ProjectsComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (projects) => {
-          console.log('📦 Loaded projects:', projects.length);
-
-          // Fetch members and tasks for each project
-          if (projects.length === 0) {
-            this.projects.set([]);
-            this.isLoading.set(false);
-            return;
-          }
-
-          const projectsWithMembersAndTasks$ = projects.map((project) =>
-            forkJoin({
-              members: this.projectsService.loadProjectMembers(project.id).pipe(
-                catchError(() => {
-                  console.warn(`Failed to load members for project ${project.id}`);
-                  return of([]);
-                }),
-              ),
-              tasks: this.tasksService.getTasksByProject(project.id).pipe(
-                map((response) => response.data),
-                catchError(() => {
-                  console.warn(`Failed to load tasks for project ${project.id}`);
-                  return of([]);
-                }),
-              ),
-            }).pipe(
-              map(({ members, tasks }) => {
-                console.log(`👥 Members for ${project.name}:`, members.length);
-                console.log(`📋 Tasks for ${project.name}:`, tasks.length);
-                return { ...project, members, tasks };
-              }),
-            ),
-          );
-
-          forkJoin(projectsWithMembersAndTasks$)
-            .pipe(takeUntilDestroyed(this.destroyRef))
-            .subscribe({
-              next: (enrichedProjects: any) => {
-                console.log('✅ Enriched projects:', enrichedProjects);
-                this.projects.set(this.filterVisibleProjects(enrichedProjects as Project[]));
-                this.isLoading.set(false);
-              },
-              error: (err) => {
-                console.error('Failed to enrich projects with members and tasks:', err);
-                this.projects.set(this.filterVisibleProjects(projects)); // Fallback to projects without members/tasks
-                this.isLoading.set(false);
-              },
-            });
+          console.log('📦 Loaded projects with members and tasks:', projects.length);
+          // Backend now returns projects with members and tasks included
+          // No need for additional API calls - N+1 problem solved!
+          this.projects.set(this.filterVisibleProjects(projects));
+          this.isLoading.set(false);
         },
         error: (err: any) => {
           console.error('Failed to load projects:', err);
@@ -172,25 +126,10 @@ export class ProjectsComponent {
   }
 
   onProjectCreated(newProject: Project) {
-    // Fetch members for the newly created project (owner is auto-added)
-    const members = this.projectsService.getProjectMembers(newProject.id)();
-    of(members)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: (members) => {
-          const enrichedProject = { ...newProject, members };
-          this.projects.update((current) =>
-            this.filterVisibleProjects([enrichedProject, ...current]),
-          );
-        },
-        error: () => {
-          // Fallback: add project without members
-          console.warn(`Failed to load members for new project ${newProject.id}`);
-          this.projects.update((current) =>
-            this.filterVisibleProjects([{ ...newProject, members: [] }, ...current]),
-          );
-        },
-      });
+    // Backend returns complete project with members, tasks, and owner
+    this.projects.update((current) =>
+      this.filterVisibleProjects([newProject, ...current]),
+    );
     this.showModal.set(false);
     this.selectedProject.set(null);
   }

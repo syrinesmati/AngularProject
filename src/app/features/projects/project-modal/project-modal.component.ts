@@ -159,42 +159,19 @@ export class ProjectModalComponent implements OnChanges {
   }
 
   loadUsers() {
-    const currentUser = this.authService.currentUserSignal();
-    const projectId = this.isEditing && this.projectToEdit ? this.projectToEdit.id : null;
-
-    if (currentUser?.role === 'ADMIN') {
-      this.usersService
-        .getAllUsers()
-        .pipe(takeUntilDestroyed(this.destroyRef))
-        .subscribe({
-          next: (users) => {
-            this.availableUsers.set(users);
-          },
-          error: (err) => {
-            console.error('Failed to load users:', err);
-          },
-        });
-    } else if (projectId) {
-      // For non-admins, use getAssignableUsers
-      this.usersService
-        .getAssignableUsers(projectId)
-        .pipe(takeUntilDestroyed(this.destroyRef))
-        .subscribe({
-          next: (users) => {
-            this.availableUsers.set(users);
-          },
-          error: (err) => {
-            console.error('Failed to load assignable users:', err);
-          },
-        });
-    } else {
-      // For creating new project as non-admin, only show current user
-      if (currentUser) {
-        this.availableUsers.set([currentUser]);
-        // Auto-select current user as owner
-        this.selectedOwnerIds.set([currentUser.id]);
-      }
-    }
+    // Only admins can create projects, but any project member can edit
+    // Always load all users so any user can be added when editing
+    this.usersService
+      .getAllUsers()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (users) => {
+          this.availableUsers.set(users);
+        },
+        error: (err) => {
+          console.error('Failed to load users:', err);
+        },
+      });
   }
 
   toggleOwner(userId: string) {
