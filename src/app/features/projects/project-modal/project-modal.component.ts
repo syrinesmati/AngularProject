@@ -19,7 +19,7 @@ import {
   AbstractControl,
   ValidationErrors,
 } from '@angular/forms';
-import { forkJoin, of } from 'rxjs';
+import { forkJoin, of, switchMap, concatMap } from 'rxjs';
 import { map, catchError, debounceTime, distinctUntilChanged } from 'rxjs/operators';
 import { Observable } from 'rxjs';
 import { ProjectsService } from '../../../core/services/projects.service';
@@ -357,77 +357,34 @@ export class ProjectModalComponent implements OnChanges {
         (this.projectToEdit.color ?? '') !== (updatePayload.color ?? '');
 
       const runMemberOperations = () => {
-        if (memberOps.length === 0) {
-          return of([] as any[]);
-        }
-        return forkJoin(memberOps);
+        return memberOps.length === 0 ? of([] as any[]) : forkJoin(memberOps);
       };
 
-      if (projectFieldsChanged) {
-        // Update project and then members
-        this.projectsService
-          .updateProject(projectId, updatePayload)
-          .pipe(takeUntilDestroyed(this.destroyRef))
-          .subscribe({
-            next: (updatedProject) => {
-              runMemberOperations()
-                .pipe(takeUntilDestroyed(this.destroyRef))
-                .subscribe({
-                  next: () => {
-                    // Reload members and emit updated project
-                    this.projectsService
-                      .getProjectById(projectId)
-                      .pipe(takeUntilDestroyed(this.destroyRef))
-                      .subscribe({
-                        next: (projectWithMembers) => {
-                          this.projectUpdated.emit(projectWithMembers);
-                          this.onClose();
-                        },
-                        error: (err: any) => {
-                          console.warn('Project updated but failed to reload members:', err);
-                          this.projectUpdated.emit(updatedProject);
-                          this.onClose();
-                        },
-                      });
-                  },
-                  error: (err: any) => {
-                    console.error('Failed to sync members:', err);
-                    this.isSubmitting.set(false);
-                  },
-                });
-            },
-            error: (err) => {
-              console.error('Failed to update project:', err);
-              this.isSubmitting.set(false);
-            },
-          });
-      } else {
-        // Only update members
-        runMemberOperations()
-          .pipe(takeUntilDestroyed(this.destroyRef))
-          .subscribe({
-            next: () => {
-              // Reload the project with updated members
-              this.projectsService
-                .getProjectById(projectId)
-                .pipe(takeUntilDestroyed(this.destroyRef))
-                .subscribe({
-                  next: (updatedProject) => {
-                    this.projectUpdated.emit(updatedProject);
-                    this.onClose();
-                  },
-                  error: (err) => {
-                    console.error('Failed to reload project:', err);
-                    this.isSubmitting.set(false);
-                  },
-                });
-            },
-            error: (err: any) => {
-              console.error('Failed to sync members:', err);
-              this.isSubmitting.set(false);
-            },
-          });
-      }
+      // Use RxJS operators to avoid nested subscriptions
+      const updateOperation$ = projectFieldsChanged
+        ? this.projectsService.updateProject(projectId, updatePayload)
+        : of(this.projectToEdit);
+
+      updateOperation$
+        .pipe(
+          switchMap((updatedProject) => 
+            runMemberOperations().pipe(
+              map(() => updatedProject)
+            )
+          ),
+          switchMap(() => this.projectsService.getProjectById(projectId)),
+          takeUntilDestroyed(this.destroyRef)
+        )
+        .subscribe({
+          next: (projectWithMembers) => {
+            this.projectUpdated.emit(projectWithMembers);
+            this.onClose();
+          },
+          error: (err) => {
+            console.error('Failed to update project:', err);
+            this.isSubmitting.set(false);
+          },
+        });
     } else {
       // Create new project
       const payload = {

@@ -147,11 +147,13 @@ export class TaskModalComponent implements OnInit, OnDestroy {
     // Only set up subscriptions, NOT data initialization
     // Data initialization happens in ngOnChanges
 
+    // Consolidated subscription for form control changes
     merge(
       this.startDateControl.valueChanges.pipe(
         map((value) => ({ type: 'startDate' as const, value }))
       ),
       this.projectIdControl.valueChanges.pipe(
+        startWith(this.projectIdControl.value),
         map((value) => ({ type: 'projectId' as const, value }))
       )
     )
@@ -161,19 +163,16 @@ export class TaskModalComponent implements OnInit, OnDestroy {
           this.updateDueDateAvailability(event.value);
         } else {
           this.updateAssigneesAvailability(event.value);
+          // Load assignees when project changes
+          this.fetchAssignees$(event.value)
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe((users) => {
+              this.assignees = this.normalizeUsers(users);
+            });
         }
       });
 
-    this.projectIdControl.valueChanges
-      .pipe(
-        startWith(this.projectIdControl.value),
-        switchMap((projectId) => this.fetchAssignees$(projectId)),
-        takeUntilDestroyed(this.destroyRef)
-      )
-      .subscribe((users) => {
-        this.assignees = this.normalizeUsers(users);
-      });
-
+    // Form auto-save with debounce
     this.taskForm.valueChanges
       .pipe(
         debounceTime(500),

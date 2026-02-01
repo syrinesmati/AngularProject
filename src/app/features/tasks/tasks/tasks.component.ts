@@ -11,6 +11,8 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ScrollingModule } from '@angular/cdk/scrolling';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Subject } from 'rxjs';
+import { debounceTime } from 'rxjs/operators';
 
 import { TasksService, FilterTaskDto } from '../../../core/services/task.service';
 import { ProjectsService } from '../../../core/services/projects.service';
@@ -66,6 +68,7 @@ export class TasksComponent implements OnInit {
   private labelsService = inject(LabelsService);
   private authService = inject(AuthService);
   private destroyRef = inject(DestroyRef);
+  private filterChange$ = new Subject<void>();
 
   // State signals
   isLoading = signal(true);
@@ -201,6 +204,16 @@ export class TasksComponent implements OnInit {
   );
 
   ngOnInit() {
+    // Debounce filter changes to avoid excessive API calls
+    this.filterChange$
+      .pipe(
+        debounceTime(300),
+        takeUntilDestroyed(this.destroyRef)
+      )
+      .subscribe(() => {
+        this.loadTasks();
+      });
+
     this.loadData();
   }
 
@@ -271,27 +284,27 @@ export class TasksComponent implements OnInit {
   // Filter methods
   onSearchChange(query: string) {
     this.searchQuery.set(query);
-    this.loadTasks();
+    this.filterChange$.next();
   }
 
   onStatusFilterChange(status: string) {
     this.statusFilter.set(status as TaskStatus | 'all');
-    this.loadTasks();
+    this.filterChange$.next();
   }
 
   onPriorityFilterChange(priority: string) {
     this.priorityFilter.set(priority as TaskPriority | 'all');
-    this.loadTasks();
+    this.filterChange$.next();
   }
 
   onProjectFilterChange(projectId: string) {
     this.projectFilter.set(projectId);
-    this.loadTasks();
+    this.filterChange$.next();
   }
 
   onLabelFilterChange(labelId: string) {
     this.labelFilter.set(labelId);
-    this.loadTasks();
+    this.filterChange$.next();
   }
 
   clearFilters() {
@@ -300,7 +313,7 @@ export class TasksComponent implements OnInit {
     this.priorityFilter.set('all');
     this.projectFilter.set('all');
     this.labelFilter.set('all');
-    this.loadTasks();
+    this.filterChange$.next();
   }
 
   // Sorting methods

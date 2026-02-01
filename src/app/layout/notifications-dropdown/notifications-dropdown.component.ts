@@ -5,16 +5,13 @@ import {
   computed,
   effect,
   OnInit,
-  DestroyRef,
   ChangeDetectionStrategy,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ScrollingModule } from '@angular/cdk/scrolling';
 import { RouterLink } from '@angular/router';
 import { formatDistanceToNow } from 'date-fns';
-import { interval, firstValueFrom } from 'rxjs';
-import { switchMap } from 'rxjs/operators';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { firstValueFrom } from 'rxjs';
 import { LucideIconComponent } from '../../shared/components/lucide-icon/lucide-icon.component';
 import { NotificationsService } from '../../core/services/notifications.service';
 import { Notification, NotificationType } from '../../core/models/notification.model';
@@ -29,7 +26,6 @@ import { Notification, NotificationType } from '../../core/models/notification.m
 })
 export class NotificationsDropdownComponent implements OnInit {
   public notificationsService = inject(NotificationsService);
-  private destroyRef = inject(DestroyRef);
 
   // UI state
   showDropdown = signal(false);
@@ -49,25 +45,8 @@ export class NotificationsDropdownComponent implements OnInit {
   }
 
   ngOnInit() {
-    // Data is already loaded by resolver, just start polling for updates
-    this.startPolling();
-  }
-
-  private startPolling() {
-    // Poll for unread count updates every 30 seconds
-    interval(30000)
-      .pipe(
-        switchMap(() => this.notificationsService.loadUnreadCount()),
-        takeUntilDestroyed(this.destroyRef),
-      )
-      .subscribe({
-        next: () => {
-          // Unread count updated
-        },
-        error: () => {
-          // Silently fail polling
-        },
-      });
+    // Data is already loaded by resolver
+    // Service already polls for updates, no need to duplicate here
   }
 
   toggleDropdown() {
