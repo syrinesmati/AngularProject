@@ -98,6 +98,13 @@ export class ProjectsComponent {
   // Memoize empty state creation button visibility
   showCreateInEmptyState = computed(() => !this.searchQuery() && this.isCurrentUserAdmin());
 
+  // Compute the currently selected project from the projects list based on selectedProjectId
+  currentProjectFromList = computed(() => {
+    const projectId = this.selectedProjectId();
+    if (!projectId) return null;
+    return this.projects().find((p) => p.id === projectId) || null;
+  });
+
   constructor() {
     // Load projects when the current user is available.
     // Use untracked() to avoid re-running due to service cache updates.
@@ -167,8 +174,18 @@ export class ProjectsComponent {
         }),
       ),
     );
+    
+    // Update the selected project if it's currently open in the details panel
+    const current = this.selectedProject();
+    if (current && current.id === updatedProject.id) {
+      this.selectedProject.set({
+        ...updatedProject,
+        tasks: updatedProject.tasks ?? current.tasks,
+        members: updatedProject.members ?? current.members,
+      });
+    }
+    
     this.showModal.set(false);
-    this.selectedProject.set(null);
   }
 
   onDeleteProject(projectId: string) {
