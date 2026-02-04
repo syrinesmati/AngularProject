@@ -35,7 +35,7 @@
   }
 
   <!-- Kanban Board -->
-  @if (!isLoading()) {
+  @else {
     <div class="board-grid grid grid-cols-1 md:grid-cols-3 gap-4 h-[calc(100%-5rem)]">
       @for (column of columns; track column.id) {
         <div
@@ -81,7 +81,7 @@
                   cdkDrag
                   [cdkDragData]="task"
                   [cdkDragDisabled]="!canDragDrop()"
-                  (cdkDragStarted)="onDragStart(task)"
+                  (cdkDragStarted)="draggingTaskId.set(task.id)"
                   (cdkDragEnded)="onDragEnd()"
                   [ngClass]="
                     canDragDrop() ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'
@@ -91,7 +91,7 @@
                   <app-task-card
                     [task]="task"
                     [showProject]="selectedProjectId() === 'all'"
-                    [isDragging]="false"
+                    [isDragging]="draggingTaskId() === task.id"
                   />
 
                   <!-- Drag Preview -->

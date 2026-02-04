@@ -41,18 +41,19 @@ export class BoardComponent implements OnInit {
   // Signals for state management
   selectedProjectId = signal<string>('all');
   dragOverColumn = signal<TaskStatus | null>(null);
+  draggingTaskId = signal<string | null>(null);
   isLoading = signal<boolean>(false);
   myTasks = signal<Task[]>([]);
 
   // Computed signals
-  currentUser = computed(() => this.authService.currentUserSignal());
-  isAdmin = computed(() => this.currentUser()?.role === UserRole.ADMIN);
+  readonly currentUser = this.authService.currentUserSignal;
+  readonly isAdmin = computed(() => this.currentUser()?.role === UserRole.ADMIN);
 
   // Get unique projects from tasks
   userProjects = computed<{ id: string; name: string }[]>(() => {
     const tasks = this.myTasks();
 
-    // Declarative approach: filter tasks with projectId, then create Map for uniqueness
+    // filter tasks with projectId, then create Map for uniqueness
     const projectMap = new Map(
       tasks
         .filter((task) => task.projectId)
@@ -103,13 +104,9 @@ export class BoardComponent implements OnInit {
     return grouped;
   });
 
-  // Drag and drop handlers
-  onDragStart(task: Task) {
-    // Optional: Add visual feedback
-  }
-
   onDragEnd() {
     this.dragOverColumn.set(null);
+    this.draggingTaskId.set(null);
   }
 
   onDragOver(status: TaskStatus) {
@@ -136,7 +133,7 @@ export class BoardComponent implements OnInit {
       .updateTask(task.id, { status: newStatus })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (updatedTask) => {
+        next: () => {
           // Update the task in the local array
           const tasks = [...this.myTasks()];
           const index = tasks.findIndex((t) => t.id === task.id);
